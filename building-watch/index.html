@@ -29,6 +29,10 @@
   --warn:#ef7a63; --ok:#5cc08a; color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
+.pick{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pk{border:1px solid var(--line);background:var(--bg);color:var(--ink);font:500 .8rem var(--f-body);padding:5px 10px;border-radius:99px;cursor:pointer}
+.pk[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.pk:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 #heatGrid{touch-action:none;user-select:none;-webkit-user-select:none}
 .scrim{position:fixed;inset:0;background:rgba(10,18,28,.5);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding:16px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
 @media (min-width:600px){.scrim{align-items:center}}
@@ -141,13 +145,15 @@ ul.list li{display:flex;justify-content:space-between;gap:8px;border-bottom:1px 
           <span><span class="sw" style="background:var(--accent);width:5px"></span>Watch assigned</span>
         </div>
       </div>
+      <div class="pick" id="pickRow" role="group" aria-label="Watch stander"></div>
       <div class="scroll"><table class="grid" id="heatGrid"></table></div>
       <div id="slotInfo" class="empty">Drag over a block of time to assign the watch.</div>
     </div>
 
     <div class="panel">
       <h2>Assign the watch</h2>
-      <p class="sub" style="margin:0">Drag down a day on the chart to highlight the watch window. A box opens with everyone who is in the building then, best fit first. Tap a name to assign.</p>
+      <p class="sub" style="margin:0">Tap a name above the chart, then drag down a day to paint their watch. Confirm in the box that opens. Leave it on "Suggest for me" to drag first and pick from who is in the building.</p>
+      <p class="sub" style="margin:0">One person on watch at a time. A new watch replaces whoever had that window.</p>
       <div>
         <h2 style="font-size:1rem;margin-bottom:6px">Watch bill this week</h2>
         <ul class="list" id="allAsg"></ul>
@@ -252,14 +258,24 @@ const hend=()=>{if(!drag)return;drag=null;openDlg()};
 hg.addEventListener("pointerup",hend);hg.addEventListener("pointercancel",hend);
 hg.addEventListener("keydown",e=>{if(e.key==="Enter"){const td=e.target.closest("td");if(td){const i=+td.dataset.i;sel={d:+td.dataset.d,s:i,e:i+1};drawHeat();openDlg()}}});
 function openDlg(){const {d,s,e}=sel;pick(d,s);
-  $("dlgT").textContent=`Watch: ${DAYS[d]}, ${fmt(SLOTS[s])}-${fmt(SLOTS[e-1]+30)}`;
+  const win=`${DAYS[d]}, ${fmt(SLOTS[s])}-${fmt(SLOTS[e-1]+30)}`;
+  $("dlgT").textContent=stander?`Assign ${stander} the watch?`:`Watch: ${win}`;
   const cur=[...new Set(asg.filter(x=>x.d===d&&x.s<e&&x.e>s).map(x=>x.who))];
-  $("dlgSub").textContent=cur.length?"Currently on watch: "+cur.join(", "):"No watch assigned in this window.";
-  $("dlgClear").hidden=!cur.length;suggest();$("modal").hidden=false;$("dlgCancel").focus()}
+  $("dlgSub").textContent=(stander?win+". ":"")+(cur.length?"Currently on watch: "+cur.join(", "):"No watch assigned in this window.");
+  $("dlgClear").hidden=!cur.length;if(stander)single();else suggest();$("modal").hidden=false;$("dlgCancel").focus()}
+let stander=null;
+function drawPick(){$("pickRow").innerHTML=[""].concat(people.map(p=>p.n)).map(n=>`<button class="pk" aria-pressed="${n===(stander||"")}" data-n="${n}">${n||"Suggest for me"}</button>`).join("")}
+$("pickRow").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;stander=b.dataset.n||null;drawPick()});
+function cut(d,s,e){const out=[];asg.forEach(x=>{if(x.d!==d||x.e<=s||x.s>=e){out.push(x);return}if(x.s<s)out.push({...x,e:s});if(x.e>e)out.push({...x,s:e})});asg=out}
+function assignWatch(who,d,s,e){cut(d,s,e);asg.push({who,d,s,e});asg.sort((a,b)=>a.d-b.d||a.s-b.s);monthCount[who]=(monthCount[who]||0)+1}
+function single(){const {d,s,e}=sel,n=e-s;let c=0;for(let i=s;i<e;i++)if(avail[stander].has(d+"-"+i))c++;
+  const st=c===n?'<span class="chip">In the building the whole time</span>':c?`<span class="chip warn">In the building ${c} of ${n} half hours</span>`:'<span class="chip warn">Not in the building then</span>';
+  const rep=[...new Set(asg.filter(x=>x.d===d&&x.s<e&&x.e>s&&x.who!==stander).map(x=>x.who))];
+  $("cands").innerHTML=`<li class="cand best"><div><b>${stander}</b><div class="why" style="margin-top:4px">${st}</div>${rep.length?`<div class="why">Replaces ${rep.join(", ")} for this window</div>`:""}</div><button class="btn small primary" data-who="${stander}">Assign</button></li>`}
 function closeDlg(){$("modal").hidden=true;sel=null;drawHeat()}
 $("dlgCancel").onclick=closeDlg;
 $("modal").addEventListener("click",e=>{if(e.target.id==="modal")closeDlg()});
-$("dlgClear").onclick=()=>{const {d,s,e}=sel;asg=asg.filter(x=>!(x.d===d&&x.s<e&&x.e>s));closeDlg();drawAll();toast("Watch removed")};
+$("dlgClear").onclick=()=>{const {d,s,e}=sel;cut(d,s,e);closeDlg();drawAll();toast("Watch removed")};
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("modal").hidden)closeDlg()});
 function pick(d,i){const w=whoIn(d,i);
   $("slotInfo").innerHTML=`<b>${DAYS[d]} ${fmt(SLOTS[i])}</b>: `+(w.length?w.join(", "):"<span style='color:var(--warn)'>nobody in the building</span>")+"<br>Watch: "+(watchAt(d,i)?"<b>"+watchAt(d,i)+"</b>":"<span style='color:var(--warn)'>not assigned</span>");}
@@ -281,8 +297,7 @@ function suggest(){if(!sel)return;const d=sel.d,s=sel.s,e=sel.e;
       <button class="btn small ${k===0?"primary":""}" data-who="${x.p.n}">Assign</button></li>`}).join("")}
 $("cands").addEventListener("click",e=>{const b=e.target.closest("button[data-who]");if(!b)return;
   const d=sel.d,s=sel.s,en=sel.e;closeDlg();
-  asg=asg.filter(x=>!(x.d===d&&x.s<en&&x.e>s));
-  asg.push({who:b.dataset.who,d,s,e:en});asg.sort((a,b)=>a.d-b.d||a.s-b.s);monthCount[b.dataset.who]=(monthCount[b.dataset.who]||0)+1;
+  assignWatch(b.dataset.who,d,s,en);
   drawAll();toast(`Watch assigned to ${b.dataset.who} (demo)`)});
 
 function drawAll(){drawPaint();drawHeat();suggest();
@@ -292,7 +307,7 @@ function drawAll(){drawPaint();drawHeat();suggest();
 function view(v){$("sailor").hidden=v!=="sailor";$("chief").hidden=v!=="chief";
   $("vSailor").setAttribute("aria-pressed",v==="sailor");$("vChief").setAttribute("aria-pressed",v==="chief");drawAll()}
 $("vSailor").onclick=()=>view("sailor");$("vChief").onclick=()=>view("chief");
-view(location.hash==="#chief"?"chief":"sailor");
+drawPick();view(location.hash==="#chief"?"chief":"sailor");
 </script>
 
 </html>
