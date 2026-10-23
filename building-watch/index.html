@@ -4,13 +4,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: app bar with role switch, then one working panel (sailor grid or Senior Chief board) */
+/* Layout: app bar with role switch and tabs, then one working section per tab */
 :root{
   --bg:#f3f5f8; --surface:#ffffff; --ink:#15212f; --muted:#5b6878; --line:#d8dee6;
   --accent:#b8862b; --accent-ink:#ffffff; --navy:#1f3a5c;
   --paint:#2f6fae; --paint-soft:#d6e4f3;
   --h0:#eef1f5; --h1:#d3e2f1; --h2:#9fc0e2; --h3:#5f93c8; --h4:#2f6fae;
-  --warn:#c2412d; --ok:#2e7d4f;
+  --warn:#c2412d; --warn-soft:#fbe7e3; --ok:#2e7d4f; --ok-soft:#e1f2e8;
   --f-display:"IBM Plex Sans Condensed","Arial Narrow",sans-serif;
   --f-body:"IBM Plex Sans",system-ui,sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,monospace;
@@ -20,50 +20,49 @@
   --accent:#d6a64a; --accent-ink:#1a1206; --navy:#9cc0e8;
   --paint:#5b9be0; --paint-soft:#1d3550;
   --h0:#1a2531; --h1:#1d3550; --h2:#24507d; --h3:#3a76b4; --h4:#5b9be0;
-  --warn:#ef7a63; --ok:#5cc08a; color-scheme:dark}}
+  --warn:#ef7a63; --warn-soft:#3a1d18; --ok:#5cc08a; --ok-soft:#173226; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0e151e; --surface:#16202c; --ink:#e6ecf3; --muted:#93a1b2; --line:#2a3646;
   --accent:#d6a64a; --accent-ink:#1a1206; --navy:#9cc0e8;
   --paint:#5b9be0; --paint-soft:#1d3550;
   --h0:#1a2531; --h1:#1d3550; --h2:#24507d; --h3:#3a76b4; --h4:#5b9be0;
-  --warn:#ef7a63; --ok:#5cc08a; color-scheme:dark}
+  --warn:#ef7a63; --warn-soft:#3a1d18; --ok:#5cc08a; --ok-soft:#173226; color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-.pick{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.pk{border:1px solid var(--line);background:var(--bg);color:var(--ink);font:500 .8rem var(--f-body);padding:5px 10px;border-radius:99px;cursor:pointer}
-.pk[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.pk:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-#heatGrid{touch-action:none;user-select:none;-webkit-user-select:none}
-.scrim{position:fixed;inset:0;background:rgba(10,18,28,.5);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding:16px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
-@media (min-width:600px){.scrim{align-items:center}}
-.dlg{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;width:100%;max-width:420px;display:flex;flex-direction:column;gap:12px;max-height:85vh;overflow:auto}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
-.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
 header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
-h1{font-family:var(--f-display);font-weight:700;font-size:1.9rem;margin:0;letter-spacing:.01em;text-wrap:balance}
-.sub{color:var(--muted);font-size:.9rem;margin:2px 0 0}
+h1{font-family:var(--f-display);font-weight:700;font-size:1.9rem;margin:0;letter-spacing:.01em}
+h2{font-family:var(--f-display);font-weight:700;font-size:1.2rem;margin:0}
+h3{font-family:var(--f-display);font-weight:700;font-size:1rem;margin:0}
+.sub{color:var(--muted);font-size:.88rem;margin:2px 0 0}
 .eyebrow{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.hright{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
-.seg button{border:0;background:transparent;color:var(--muted);font:600 .9rem var(--f-body);padding:9px 14px;cursor:pointer}
+.seg button{border:0;background:transparent;color:var(--muted);font:600 .88rem var(--f-body);padding:9px 13px;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--navy);color:var(--bg)}
-.seg button:focus-visible,.btn:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line)}
+.tabs button{border:0;background:transparent;color:var(--muted);font:600 .9rem var(--f-body);padding:10px 12px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tabs .badge{display:inline-block;min-width:18px;padding:0 5px;margin-left:5px;border-radius:99px;background:var(--warn);color:#fff;font:600 .7rem/18px var(--f-mono);text-align:center}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .note{font-size:.82rem;color:var(--muted);border-left:3px solid var(--accent);padding:6px 10px;background:var(--surface)}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
-h2{font-family:var(--f-display);font-weight:700;font-size:1.2rem;margin:0}
+.stack{display:flex;flex-direction:column;gap:16px}
 .btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 .88rem var(--f-body);padding:8px 13px;border-radius:7px;cursor:pointer}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .btn.small{padding:5px 10px;font-size:.8rem}
+.btn.link{border:0;background:none;color:var(--paint);padding:4px 0;text-decoration:underline}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table.grid{border-collapse:separate;border-spacing:3px;width:100%;min-width:520px;font-variant-numeric:tabular-nums}
 .grid th{font:500 .74rem var(--f-mono);color:var(--muted);text-align:center;padding:2px 0;white-space:nowrap}
 .grid th.t{text-align:right;padding-right:6px;width:46px}
 .grid td{height:24px;border-radius:4px;background:var(--h0);position:relative}
-#paintGrid{touch-action:none;user-select:none;-webkit-user-select:none}
+#paintGrid,#heatGrid{touch-action:none;user-select:none;-webkit-user-select:none}
 #paintGrid td{cursor:crosshair}
 #paintGrid td.on{background:var(--paint)}
-#paintGrid td.on.top{border-top-left-radius:7px;border-top-right-radius:7px}
 #paintGrid td.asg::after{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--accent)}
 #heatGrid td{cursor:pointer;text-align:center;font:500 .72rem var(--f-mono);color:var(--ink)}
 #heatGrid td.l1{background:var(--h1)} #heatGrid td.l2{background:var(--h2)}
@@ -71,27 +70,49 @@ table.grid{border-collapse:separate;border-spacing:3px;width:100%;min-width:520p
 #heatGrid td.gap{background:transparent;outline:1.5px dashed var(--warn);outline-offset:-2px;color:var(--warn)}
 #heatGrid td.sel{box-shadow:0 0 0 2px var(--accent) inset}
 #heatGrid td.w::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent);border-radius:4px 0 0 4px}
+#heatGrid td.w2::before{width:7px}
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:.78rem;color:var(--muted);align-items:center}
 .sw{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:5px}
-.cols{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px}
-@media (max-width:820px){.cols{grid-template-columns:1fr}}
+.cols{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px;align-items:start}
+.cols2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+@media (max-width:820px){.cols,.cols2{grid-template-columns:1fr}}
 label{font-size:.78rem;color:var(--muted);display:flex;flex-direction:column;gap:4px}
-select,input{font:500 .9rem var(--f-body);padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:0}
+label.inline{flex-direction:row;align-items:center;gap:8px;font-size:.88rem;color:var(--ink)}
+select,input,textarea{font:500 .9rem var(--f-body);padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:0;width:100%}
+input[type=checkbox],input[type=radio]{width:auto;accent-color:var(--accent)}
+textarea{min-height:58px;resize:vertical}
 .form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .form .full{grid-column:1/-1}
-ol.cands{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
-.cand{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:8px}
-.cand.best{border-color:var(--accent)}
-.cand b{font-weight:600}
-.why{font-size:.76rem;color:var(--muted)}
+.pick{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pk{border:1px solid var(--line);background:var(--bg);color:var(--ink);font:500 .8rem var(--f-body);padding:5px 10px;border-radius:99px;cursor:pointer}
+.pk[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+ul.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:.88rem}
+ul.list>li{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--line);padding-bottom:7px}
+.item{display:flex;flex-direction:column;gap:2px;min-width:0}
+.why{font-size:.78rem;color:var(--muted)}
 .chip{font:500 .7rem var(--f-mono);padding:2px 7px;border-radius:99px;background:var(--paint-soft);color:var(--ink);white-space:nowrap}
-.chip.warn{background:transparent;border:1px solid var(--warn);color:var(--warn)}
-ul.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:.86rem}
-ul.list li{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding-bottom:6px}
-.mono{font-family:var(--f-mono);font-size:.8rem;color:var(--muted)}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;font-size:.88rem}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.gold{background:var(--accent);color:var(--accent-ink)}
+.mono{font-family:var(--f-mono);font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums}
 .empty{color:var(--muted);font-size:.86rem}
-@media (prefers-reduced-motion:no-preference){#paintGrid td,#heatGrid td{transition:background .12s}}
+.watchcard{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.bar{height:6px;border-radius:99px;background:var(--h0);overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--ok)}
+table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-numeric:tabular-nums}
+.tbl th{font:600 .72rem var(--f-mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl td.n{text-align:right}
+.tbl select,.tbl input{padding:4px 6px;font-size:.82rem}
+.big{font:700 2rem var(--f-display);line-height:1}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;font-size:.88rem;z-index:30}
+.scrim{position:fixed;inset:0;background:rgba(10,18,28,.5);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding:16px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+@media (min-width:600px){.scrim{align-items:center}}
+.dlg{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;width:100%;max-width:460px;display:flex;flex-direction:column;gap:12px;max-height:88vh;overflow:auto}
+.cand{display:flex;gap:10px;align-items:flex-start;padding:9px 11px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.cand:has(input:checked){border-color:var(--accent)}
+.cand input{margin-top:3px}
+.cand b{font-weight:600}
 </style>
 
 <div class="wrap">
@@ -99,40 +120,47 @@ ul.list li{display:flex;justify-content:space-between;gap:8px;border-bottom:1px 
     <div>
       <div class="eyebrow">Facilities · Prototype · Sample data</div>
       <h1>Building Watch</h1>
-      <p class="sub">Week of November 2 · 0730 to 1600</p>
+      <p class="sub">Week of November 2, 2026 · demo "today" is Wed 11/4</p>
     </div>
-    <div class="seg" role="group" aria-label="View as">
-      <button id="vSailor" aria-pressed="true">Sailor view</button>
-      <button id="vChief" aria-pressed="false">Senior Chief view</button>
+    <div class="hright">
+      <button class="btn primary" id="quickReq">+ Service request</button>
+      <div class="seg" role="group" aria-label="View as">
+        <button id="vSailor" aria-pressed="true">Sailor</button>
+        <button id="vChief" aria-pressed="false">Senior Chief</button>
+      </div>
     </div>
   </header>
+  <nav class="tabs" id="tabs" role="tablist"></nav>
 
-  <!-- SAILOR -->
-  <section id="sailor" class="panel">
-    <div class="row">
-      <div>
-        <h2>When will you be in the building?</h2>
-        <div class="sub">Signed in as <b id="meName"></b>. Drag down a day to paint your time. Drag over painted time to erase.</div>
+  <!-- SAILOR: MY WEEK -->
+  <section id="s-week" class="cols">
+    <div class="panel">
+      <div class="row">
+        <div><h2>When will you be in the building?</h2>
+        <div class="sub">Signed in as <b id="meName"></b>. Drag down a day to paint your time. Drag over painted time to erase.</div></div>
+        <div class="row" style="gap:8px">
+          <button class="btn small" id="copyMon">Copy Monday to all</button>
+          <button class="btn small" id="clearMe">Clear</button>
+          <button class="btn small primary" id="saveMe">Save to calendar</button>
+        </div>
       </div>
-      <div class="row" style="gap:8px">
-        <button class="btn small" id="copyMon">Copy Monday to all</button>
-        <button class="btn small" id="clearMe">Clear</button>
-        <button class="btn primary" id="saveMe">Save to calendar</button>
+      <div class="scroll"><table class="grid" id="paintGrid"></table></div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--paint)"></span>In the building</span>
+        <span><span class="sw" style="background:var(--accent);border-radius:50%"></span>You have the watch</span>
       </div>
     </div>
-    <div class="scroll"><table class="grid" id="paintGrid"></table></div>
-    <div class="legend">
-      <span><span class="sw" style="background:var(--paint)"></span>In the building</span>
-      <span><span class="sw" style="background:var(--accent);border-radius:50%"></span>You have the watch</span>
-    </div>
-    <div>
-      <h2 style="font-size:1rem;margin-bottom:6px">My watches</h2>
-      <ul class="list" id="myAsg"></ul>
-    </div>
+    <div class="panel"><h2>My watches</h2><div class="sub" style="margin-top:-8px">Check off duties as you complete them.</div><div class="stack" id="myWatches"></div></div>
   </section>
 
-  <!-- CHIEF -->
-  <section id="chief" class="cols" hidden>
+  <!-- SAILOR: CHECK IN -->
+  <section id="s-checkin" class="cols"><div class="panel" id="checkPanel"></div><div class="panel"><h2>In the building now</h2><ul class="list" id="nowListS"></ul></div></section>
+
+  <!-- BOTH: REQUESTS -->
+  <section id="s-reqs" class="panel"></section>
+
+  <!-- CHIEF: WATCH BILL -->
+  <section id="s-bill" class="cols">
     <div class="panel">
       <div class="row">
         <h2>Who's in the building</h2>
@@ -142,172 +170,331 @@ ul.list li{display:flex;justify-content:space-between;gap:8px;border-bottom:1px 
           <span><span class="sw" style="background:var(--h3)"></span>3</span>
           <span><span class="sw" style="background:var(--h4)"></span>4+</span>
           <span><span class="sw" style="outline:1.5px dashed var(--warn);outline-offset:-2px"></span>Nobody</span>
-          <span><span class="sw" style="background:var(--accent);width:5px"></span>Watch assigned</span>
+          <span><span class="sw" style="background:var(--accent);width:5px"></span>Watch</span>
         </div>
       </div>
-      <div class="pick" id="pickRow" role="group" aria-label="Watch stander"></div>
+      <div class="pick" id="pickRow" role="group" aria-label="Watch standers"></div>
       <div class="scroll"><table class="grid" id="heatGrid"></table></div>
-      <div id="slotInfo" class="empty">Drag over a block of time to assign the watch.</div>
+      <div id="slotInfo" class="empty">Drag down a day to set the watch for that block of time.</div>
     </div>
-
     <div class="panel">
       <h2>Assign the watch</h2>
-      <p class="sub" style="margin:0">Tap a name above the chart, then drag down a day to paint their watch. Confirm in the box that opens. Leave it on "Suggest for me" to drag first and pick from who is in the building.</p>
-      <p class="sub" style="margin:0">One person on watch at a time. A new watch replaces whoever had that window.</p>
-      <div>
-        <h2 style="font-size:1rem;margin-bottom:6px">Watch bill this week</h2>
-        <ul class="list" id="allAsg"></ul>
-      </div>
+      <p class="sub" style="margin:0">Tap one or more names, then drag down a day. A box opens to confirm. With "Suggest for me," drag first and check off people from who is in the building.</p>
+      <p class="sub" style="margin:0">Several people can share a watch. Unchecking someone in the box takes them off that block.</p>
+      <div><h3 style="margin-bottom:6px">Watch bill this week</h3><ul class="list" id="allAsg"></ul></div>
     </div>
   </section>
 
-  <p class="note">Prototype only. Names and schedules are sample data, and nothing is sent to Google yet. In the live version, Save writes to the shared "In the Building" calendar and assigning the watch sends that sailor a private calendar invite.</p>
+  <!-- CHIEF: LOG -->
+  <section id="s-log" class="stack">
+    <div class="cols2">
+      <div class="panel"><div class="row"><h2>In the building now</h2><span class="big" id="nowCount"></span></div><ul class="list" id="nowListC"></ul></div>
+      <div class="panel"><h2>Needs follow-up</h2><ul class="list" id="fuList"></ul></div>
+    </div>
+    <div class="panel"><h2>Building log</h2><div class="scroll"><table class="tbl" id="logTbl"></table></div></div>
+  </section>
+
+  <!-- CHIEF: CHECKLIST -->
+  <section id="s-check" class="cols2">
+    <div class="panel">
+      <h2>Watch duties</h2>
+      <div class="sub" style="margin-top:-8px">Every watch stander sees this list on their watch.</div>
+      <ul class="list" id="tmplList"></ul>
+      <div class="row" style="flex-wrap:nowrap"><input id="tmplNew" placeholder="Add a duty, e.g. Check fire doors closed"><button class="btn small primary" id="tmplAdd">Add</button></div>
+    </div>
+    <div class="panel"><h2>Completion this week</h2><div class="stack" id="compList"></div></div>
+  </section>
+
+  <!-- CHIEF: REPORTS -->
+  <section id="s-reports" class="panel">
+    <div class="row">
+      <div><h2>Manpower report</h2><div class="sub">Pick a date range. Export opens in Excel or Google Sheets.</div></div>
+    </div>
+    <div class="row" style="justify-content:flex-start">
+      <label>From<input type="date" id="rFrom" value="2026-11-02"></label>
+      <label>To<input type="date" id="rTo" value="2026-11-06"></label>
+    </div>
+    <div class="scroll"><table class="tbl" id="repTbl"></table></div>
+    <div class="row" style="justify-content:flex-start">
+      <button class="btn primary" data-csv="man">Download manpower CSV</button>
+      <button class="btn" data-csv="log">Download building log</button>
+      <button class="btn" data-csv="req">Download service requests</button>
+      <button class="btn small" data-copy="man">Copy manpower table</button>
+    </div>
+  </section>
+
+  <p class="note">Prototype only. Names, schedules and requests are sample data and stay in this browser. In the live version this runs on a shared Google account: painted time writes to the "In the Building" calendar, watches go out as private invites, and requests and the log save to a shared sheet. <button class="btn link" id="resetAll">Reset sample data</button></p>
 </div>
+
 <div class="toast" id="toast" hidden></div>
 <div class="scrim" id="modal" hidden><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT">
   <h2 id="dlgT"></h2><div class="sub" id="dlgSub"></div>
-  <ol class="cands" id="cands"></ol>
-  <div class="row"><button class="btn small" id="dlgClear" hidden>Remove watch here</button><button class="btn" id="dlgCancel">Cancel</button></div>
+  <div id="dlgBody" class="stack" style="gap:10px"></div>
+  <div class="row" id="dlgAct"></div>
 </div></div>
 
 <script>
+/* ---------- constants ---------- */
 const DAYS=["Mon 11/2","Tue 11/3","Wed 11/4","Thu 11/5","Fri 11/6"];
+const DATES=["2026-11-02","2026-11-03","2026-11-04","2026-11-05","2026-11-06"];
+const TODAY=2;
 const SLOTS=[];for(let m=7*60+30;m<16*60;m+=30)SLOTS.push(m);
 const fmt=m=>String(Math.floor(m/60)).padStart(2,"0")+String(m%60).padStart(2,"0");
-const ME="MU1 Demy";
-const people=[
- {n:"MU1 Demy",skills:["A/V"]},{n:"MUC Alvarez",skills:["Electrical"]},{n:"MU2 Brooks",skills:["HVAC"]},
- {n:"MU1 Chen",skills:["A/V","Electrical"]},{n:"MU3 Okafor",skills:["Plumbing"]},{n:"MU2 Patel",skills:[]},
- {n:"MU1 Reyes",skills:["HVAC"]},{n:"MU2 Walsh",skills:["Electrical"]}
-];
-// availability: name -> Set of "d-s"
-const avail={};
-function block(n,d,a,b){avail[n]=avail[n]||new Set();SLOTS.forEach((m,i)=>{if(m>=a&&m<b)avail[n].add(d+"-"+i)})}
-const h=(x)=>{const H=Math.floor(x),M=x%1?30:0;return H*60+M};
-[[0,8,12],[1,8,15.5],[3,9,13]].forEach(([d,a,b])=>block("MU1 Demy",d,h(a),h(b)));
-[0,1,2,3,4].forEach(d=>block("MUC Alvarez",d,h(7.5),h(15.5)));
-[[0,9,15],[2,9,15],[4,9,12]].forEach(([d,a,b])=>block("MU2 Brooks",d,h(a),h(b)));
-[[1,7.5,11],[2,12,16],[3,7.5,11]].forEach(([d,a,b])=>block("MU1 Chen",d,h(a),h(b)));
-[[0,13,16],[1,13,16],[4,8,11]].forEach(([d,a,b])=>block("MU3 Okafor",d,h(a),h(b)));
-[[2,8,12],[3,12,16]].forEach(([d,a,b])=>block("MU2 Patel",d,h(a),h(b)));
-[[0,7.5,10],[3,8,16],[4,12,16]].forEach(([d,a,b])=>block("MU1 Reyes",d,h(a),h(b)));
-[[1,9,13],[2,7.5,9.5]].forEach(([d,a,b])=>block("MU2 Walsh",d,h(a),h(b)));
-people.forEach(p=>avail[p.n]=avail[p.n]||new Set());
-let asg=[
- {who:"MUC Alvarez",d:0,s:0,e:8},
- {who:"MU2 Brooks",d:0,s:8,e:12},
- {who:"MU1 Demy",d:1,s:8,e:14},
- {who:"MU1 Chen",d:1,s:0,e:7}
-];
-const span=x=>fmt(SLOTS[x.s])+"-"+fmt(SLOTS[x.e-1]+30);
-const monthCount={"MUC Alvarez":3,"MU2 Brooks":1,"MU1 Demy":1,"MU1 Chen":2,"MU3 Okafor":0,"MU2 Patel":0,"MU1 Reyes":2,"MU2 Walsh":1};
-
+const ME="MU1 Demy", CHIEF="Senior Chief";
+const PEOPLE=["MU1 Demy","MUC Alvarez","MU2 Brooks","MU1 Chen","MU3 Okafor","MU2 Patel","MU1 Reyes","MU2 Walsh"];
+const PURPOSES=["Building watch","Rehearsal or practice","Repair or maintenance","Admin or office","Other"];
+const STATUSES=["Open","Submitted to PW","In progress","Closed"];
 const $=id=>document.getElementById(id);
-function toast(t){const e=$("toast");e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2200)}
-function head(tbl){let r="<tr><th class='t'></th>"+DAYS.map(d=>"<th>"+d+"</th>").join("")+"</tr>";return r}
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9);
+const span=x=>fmt(SLOTS[x.s])+"-"+fmt(SLOTS[x.e-1]+30);
+const nowMin=()=>{const d=new Date();return d.getHours()*60+d.getMinutes()};
 
-/* ---------- Sailor paint grid ---------- */
-$("meName").textContent=ME;
-function drawPaint(){
-  const mine=avail[ME];let html=head();
-  SLOTS.forEach((m,i)=>{html+="<tr><th class='t'>"+(m%60?"":fmt(m))+"</th>";
-    DAYS.forEach((_,d)=>{const on=mine.has(d+"-"+i),top=on&&!mine.has(d+"-"+(i-1));
-      const a=asg.some(x=>x.who===ME&&x.d===d&&i>=x.s&&i<x.e);
-      html+=`<td data-k="${d}-${i}" class="${on?"on":""} ${top?"top":""} ${a?"asg":""}" aria-label="${DAYS[d]} ${fmt(m)}"></td>`});
-    html+="</tr>"});
-  $("paintGrid").innerHTML=html;
-  const list=asg.filter(x=>x.who===ME);
-  $("myAsg").innerHTML=list.length?list.map(x=>`<li><span>Building watch</span><span class="mono">${DAYS[x.d]} ${span(x)}</span></li>`).join(""):"<li class='empty'>No watches assigned.</li>";
+/* ---------- sample data ---------- */
+function sample(){
+  const avail={};PEOPLE.forEach(n=>avail[n]={});
+  const h=x=>Math.floor(x)*60+(x%1?30:0);
+  const block=(n,d,a,b)=>SLOTS.forEach((m,i)=>{if(m>=h(a)&&m<h(b))avail[n][d+"-"+i]=1});
+  [[0,8,12],[1,8,15.5],[3,9,13]].forEach(r=>block("MU1 Demy",...r));
+  [0,1,2,3,4].forEach(d=>block("MUC Alvarez",d,7.5,15.5));
+  [[0,9,15],[2,9,15],[4,9,12]].forEach(r=>block("MU2 Brooks",...r));
+  [[1,7.5,11],[2,12,16],[3,7.5,11]].forEach(r=>block("MU1 Chen",...r));
+  [[0,13,16],[1,13,16],[4,8,11]].forEach(r=>block("MU3 Okafor",...r));
+  [[2,8,12],[3,12,16]].forEach(r=>block("MU2 Patel",...r));
+  [[0,7.5,10],[3,8,16],[4,12,16]].forEach(r=>block("MU1 Reyes",...r));
+  [[1,9,13],[2,7.5,9.5]].forEach(r=>block("MU2 Walsh",...r));
+  return {
+    avail,
+    asg:[{id:"a1",who:"MUC Alvarez",d:0,s:0,e:8},{id:"a2",who:"MU2 Brooks",d:0,s:8,e:12},{id:"a3",who:"MU1 Reyes",d:0,s:0,e:5},
+         {id:"a4",who:"MU1 Chen",d:1,s:0,e:7},{id:"a5",who:"MU1 Demy",d:1,s:8,e:14},{id:"a6",who:"MUC Alvarez",d:2,s:0,e:8}],
+    month:{"MUC Alvarez":3,"MU2 Brooks":1,"MU1 Demy":1,"MU1 Chen":2,"MU3 Okafor":0,"MU2 Patel":0,"MU1 Reyes":2,"MU2 Walsh":1},
+    tmpl:["Walk all decks and stairwells","Check exterior doors are secured","Check rehearsal halls: lights, HVAC, thermostats","Check heads for leaks or outages","Turn any problems into service requests"],
+    checks:{a1:{"Walk all decks and stairwells":1,"Check exterior doors are secured":1,"Check rehearsal halls: lights, HVAC, thermostats":1,"Check heads for leaks or outages":1,"Turn any problems into service requests":1},
+            a2:{"Walk all decks and stairwells":1,"Check exterior doors are secured":1},
+            a4:{"Walk all decks and stairwells":1,"Check exterior doors are secured":1,"Check rehearsal halls: lights, HVAC, thermostats":1},
+            a6:{"Walk all decks and stairwells":1}},
+    reqs:[
+      {id:"r1",date:"2026-10-28",by:"MU2 Brooks",loc:"Loading dock door",issue:"Door closer broken, door slams",pri:"Routine",status:"Closed",wo:"WO-48650"},
+      {id:"r2",date:"2026-11-02",by:"MUC Alvarez",loc:"Rm 210",issue:"Thermostat reads 81F and will not adjust",pri:"Routine",status:"Submitted to PW",wo:"WO-48812"},
+      {id:"r3",date:"2026-11-02",by:"MU1 Reyes",loc:"2nd deck hallway",issue:"Light ballast buzzing, two fixtures out",pri:"Routine",status:"In progress",wo:""},
+      {id:"r4",date:"2026-11-03",by:"MU1 Chen",loc:"Men's head, 1st deck",issue:"Sink leaking under cabinet",pri:"Urgent",status:"Open",wo:""}],
+    log:[
+      {id:"l1",who:"MUC Alvarez",d:0,in:455,out:930,purpose:"Building watch",detail:"Morning watch",done:"Yes",fu:"",prob:"Rm 210 thermostat reads 81F",req:"r2"},
+      {id:"l2",who:"MU2 Brooks",d:0,in:545,out:900,purpose:"Repair or maintenance",detail:"Reset thermostat, rehearsal hall",done:"Partly",fu:"Needs PW tech, part on order",prob:""},
+      {id:"l3",who:"MU1 Reyes",d:0,in:450,out:600,purpose:"Building watch",detail:"Morning watch",done:"Yes",fu:"",prob:"Two lights out, 2nd deck hallway",req:"r3"},
+      {id:"l4",who:"MU3 Okafor",d:0,in:780,out:960,purpose:"Rehearsal or practice",detail:"Section rehearsal",done:"Yes",fu:"",prob:""},
+      {id:"l5",who:"MU1 Chen",d:1,in:452,out:660,purpose:"Building watch",detail:"Morning watch",done:"Yes",fu:"",prob:"Sink leaking, men's head 1st deck",req:"r4"},
+      {id:"l6",who:"MU1 Demy",d:1,in:480,out:930,purpose:"Building watch",detail:"Afternoon watch",done:"Yes",fu:"",prob:""},
+      {id:"l7",who:"MU2 Walsh",d:1,in:545,out:780,purpose:"Admin or office",detail:"Travel claims",done:"No",fu:"Need CO signature, back Thursday",prob:""},
+      {id:"l8",who:"MUC Alvarez",d:2,in:450,out:null,purpose:"Building watch",detail:"Morning watch",done:"",fu:"",prob:""},
+      {id:"l9",who:"MU2 Walsh",d:2,in:465,out:null,purpose:"Repair or maintenance",detail:"Replace ballast, 2nd deck",done:"",fu:"",prob:""},
+      {id:"l10",who:"MU2 Brooks",d:2,in:540,out:null,purpose:"Rehearsal or practice",detail:"Practice room 3",done:"",fu:"",prob:""}]
+  };
 }
-let painting=null;
-const grid=$("paintGrid");
-function cellAt(e){const el=document.elementFromPoint(e.clientX,e.clientY);return el&&el.dataset&&el.dataset.k?el:null}
-function apply(el){if(!el)return;const k=el.dataset.k;if(painting==="add")avail[ME].add(k);else avail[ME].delete(k);
-  el.classList.toggle("on",painting==="add")}
-grid.addEventListener("pointerdown",e=>{const el=cellAt(e);if(!el)return;e.preventDefault();
-  painting=avail[ME].has(el.dataset.k)?"del":"add";grid.setPointerCapture(e.pointerId);apply(el)});
-grid.addEventListener("pointermove",e=>{if(painting)apply(cellAt(e))});
-const end=()=>{if(painting){painting=null;drawPaint()}};
-grid.addEventListener("pointerup",end);grid.addEventListener("pointercancel",end);
-$("clearMe").onclick=()=>{avail[ME].clear();drawPaint()};
-$("copyMon").onclick=()=>{const mon=[...avail[ME]].filter(k=>k.startsWith("0-")).map(k=>k.split("-")[1]);
-  for(let d=1;d<5;d++){SLOTS.forEach((_,i)=>avail[ME].delete(d+"-"+i));mon.forEach(i=>avail[ME].add(d+"-"+i))}drawPaint();toast("Monday copied to the whole week")};
-$("saveMe").onclick=()=>{const n=blocks(ME).length;toast(`Saved ${n} block${n===1?"":"s"} (demo, not sent to Google)`)};
-function blocks(n){const out=[];for(let d=0;d<5;d++){let s=null;SLOTS.forEach((_,i)=>{const on=avail[n].has(d+"-"+i);
-  if(on&&s===null)s=i;if(!on&&s!==null){out.push([d,s,i]);s=null}});if(s!==null)out.push([d,s,SLOTS.length])}return out}
+let S;
+function load(){try{const t=localStorage.getItem("bw-v2");if(t){S=JSON.parse(t);return}}catch(e){}S=sample()}
+function save(){try{localStorage.setItem("bw-v2",JSON.stringify(S))}catch(e){}}
+load();
 
-/* ---------- Chief heatmap ---------- */
-let sel=null;
-function watchAt(d,i){const x=asg.find(x=>x.d===d&&i>=x.s&&i<x.e);return x&&x.who}
-function whoIn(d,i){return people.filter(p=>avail[p.n].has(d+"-"+i)).map(p=>p.n)}
+/* ---------- shell ---------- */
+let role="sailor",tab="week";
+const TABS={sailor:[["week","My week"],["checkin","Check in / out"],["reqs","Service requests"]],
+            chief:[["bill","Watch bill"],["log","Building log"],["check","Watch checklist"],["reqs","Service requests"],["reports","Reports"]]};
+const SECTIONS=["week","checkin","reqs","bill","log","check","reports"];
+function toast(t){const e=$("toast");e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2400)}
+function badges(){const open=S.reqs.filter(r=>r.status==="Open").length;const fu=followups().length;return {reqs:role==="chief"?open:0,log:fu}}
+function drawTabs(){const b=badges();$("tabs").innerHTML=TABS[role].map(([k,l])=>`<button role="tab" aria-selected="${k===tab}" data-tab="${k}">${l}${b[k]?`<span class="badge">${b[k]}</span>`:""}</button>`).join("")}
+$("tabs").addEventListener("click",e=>{const b=e.target.closest("[data-tab]");if(b){tab=b.dataset.tab;render()}});
+function setRole(r){role=r;tab=TABS[r][0][0];$("vSailor").setAttribute("aria-pressed",r==="sailor");$("vChief").setAttribute("aria-pressed",r==="chief");render()}
+$("vSailor").onclick=()=>setRole("sailor");$("vChief").onclick=()=>setRole("chief");
+function render(){save();drawTabs();SECTIONS.forEach(k=>$("s-"+k).hidden=k!==tab);
+  ({week:drawWeek,checkin:drawCheckin,reqs:drawReqs,bill:drawBill,log:drawLog,check:drawCheck,reports:drawReports})[tab]()}
+function head(){return "<tr><th class='t'></th>"+DAYS.map(d=>"<th>"+d+"</th>").join("")+"</tr>"}
+
+/* ---------- modal ---------- */
+function openModal(t,sub,body,acts){$("dlgT").textContent=t;$("dlgSub").textContent=sub||"";$("dlgSub").hidden=!sub;$("dlgBody").innerHTML=body;$("dlgAct").innerHTML=acts;$("modal").hidden=false;
+  const f=$("dlgBody").querySelector("input,textarea,select");(f||$("dlgAct").querySelector("button")).focus()}
+function closeModal(){$("modal").hidden=true;if(sel){sel=null;if(tab==="bill")drawHeat()}}
+$("modal").addEventListener("click",e=>{if(e.target.id==="modal"||e.target.dataset.act==="cancel")closeModal()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("modal").hidden)closeModal()});
+
+/* ---------- sailor: my week ---------- */
+$("meName").textContent=ME;
+const has=(n,k)=>!!S.avail[n][k];
+function drawPaint(){const mine=S.avail[ME];let html=head();
+  SLOTS.forEach((m,i)=>{html+="<tr><th class='t'>"+(m%60?"":fmt(m))+"</th>";
+    DAYS.forEach((_,d)=>{const on=mine[d+"-"+i],a=S.asg.some(x=>x.who===ME&&x.d===d&&i>=x.s&&i<x.e);
+      html+=`<td data-k="${d}-${i}" class="${on?"on":""} ${a?"asg":""}" aria-label="${DAYS[d]} ${fmt(m)}"></td>`});html+="</tr>"});
+  $("paintGrid").innerHTML=html}
+function checklistHTML(w,editable){const c=S.checks[w.id]||{};
+  return S.tmpl.map((t,k)=>`<label class="inline"><input type="checkbox" data-w="${w.id}" data-t="${esc(t)}" ${c[t]?"checked":""} ${editable?"":"disabled"}> ${esc(t)}</label>`).join("")}
+function doneCount(w){const c=S.checks[w.id]||{};return S.tmpl.filter(t=>c[t]).length}
+function drawWeek(){drawPaint();
+  const list=S.asg.filter(x=>x.who===ME);
+  $("myWatches").innerHTML=list.length?list.map(w=>{const n=doneCount(w),T=S.tmpl.length,co=S.asg.filter(x=>x.id!==w.id&&x.d===w.d&&x.s<w.e&&x.e>w.s).map(x=>x.who);
+    return `<div class="watchcard"><div class="row"><b>${DAYS[w.d]} · ${span(w)}</b><span class="chip ${n===T?"ok":""}">${n}/${T} done</span></div>
+    ${co.length?`<div class="why">With ${[...new Set(co)].join(", ")}</div>`:""}${checklistHTML(w,true)}</div>`}).join(""):"<div class='empty'>No watches assigned this week.</div>"}
+$("myWatches").addEventListener("change",e=>{const c=e.target;if(!c.dataset.w)return;S.checks[c.dataset.w]=S.checks[c.dataset.w]||{};
+  if(c.checked)S.checks[c.dataset.w][c.dataset.t]=1;else delete S.checks[c.dataset.w][c.dataset.t];drawWeek();save()});
+let painting=null;const pg=$("paintGrid");
+function cellAt(e){const el=document.elementFromPoint(e.clientX,e.clientY);return el&&el.dataset&&el.dataset.k?el:null}
+function apply(el){if(!el)return;const k=el.dataset.k;if(painting==="add")S.avail[ME][k]=1;else delete S.avail[ME][k];el.classList.toggle("on",painting==="add")}
+pg.addEventListener("pointerdown",e=>{const el=cellAt(e);if(!el)return;e.preventDefault();painting=has(ME,el.dataset.k)?"del":"add";pg.setPointerCapture(e.pointerId);apply(el)});
+pg.addEventListener("pointermove",e=>{if(painting)apply(cellAt(e))});
+const pend=()=>{if(painting){painting=null;drawPaint();save()}};pg.addEventListener("pointerup",pend);pg.addEventListener("pointercancel",pend);
+$("clearMe").onclick=()=>{S.avail[ME]={};drawPaint();save()};
+$("copyMon").onclick=()=>{const mon=Object.keys(S.avail[ME]).filter(k=>k.startsWith("0-")).map(k=>k.split("-")[1]);
+  for(let d=1;d<5;d++){SLOTS.forEach((_,i)=>delete S.avail[ME][d+"-"+i]);mon.forEach(i=>S.avail[ME][d+"-"+i]=1)}drawPaint();save();toast("Monday copied to the whole week")};
+$("saveMe").onclick=()=>toast("Saved (demo, not sent to Google)");
+
+/* ---------- check in / out ---------- */
+const openEntry=n=>S.log.find(l=>l.who===n&&l.d===TODAY&&l.out==null);
+function nowListHTML(){const open=S.log.filter(l=>l.d===TODAY&&l.out==null);
+  return open.length?open.map(l=>`<li><div class="item"><b>${esc(l.who)}</b><span class="why">${esc(l.purpose)}${l.detail?": "+esc(l.detail):""}</span></div><span class="mono">since ${fmt(l.in)}</span></li>`).join(""):"<li class='empty'>Nobody checked in.</li>"}
+function drawCheckin(){const o=openEntry(ME);$("nowListS").innerHTML=nowListHTML();
+  if(!o){$("checkPanel").innerHTML=`<h2>Check in</h2><div class="sub" style="margin-top:-8px">Tap this when you walk in. A QR code at the entrance opens this page.</div>
+    <div class="form"><label class="full">Why are you here?<select id="ciPurpose">${PURPOSES.map(p=>`<option>${p}</option>`).join("")}</select></label>
+    <label class="full">What are you working on?<input id="ciDetail" placeholder="e.g. Fix projector, Rm 114"></label></div>
+    <button class="btn primary" id="ciGo">Check in now</button>`;return}
+  $("checkPanel").innerHTML=`<h2>Check out</h2><div class="sub" style="margin-top:-8px">Checked in at <b>${fmt(o.in)}</b> for ${esc(o.purpose)}${o.detail?": "+esc(o.detail):""}.</div>
+    <div><div class="why" style="margin-bottom:4px">Did you get it done?</div><div class="row" style="justify-content:flex-start">${["Yes","Partly","No"].map(v=>`<label class="inline"><input type="radio" name="coDone" value="${v}" ${v==="Yes"?"checked":""}> ${v}</label>`).join("")}</div></div>
+    <label>Any follow-up needed?<textarea id="coFu" placeholder="Leave blank if none"></textarea></label>
+    <label>See any other problems in the building?<textarea id="coProb" placeholder="What and where. Leave blank if none"></textarea></label>
+    <div class="form" id="coReqBox" hidden><label class="full">Location<input id="coLoc" placeholder="e.g. 2nd deck, Rm 210"></label>
+      <label class="inline full"><input type="checkbox" id="coMake" checked> Turn this into a service request</label></div>
+    <button class="btn primary" id="coGo">Check out</button>`}
+$("checkPanel").addEventListener("input",e=>{if(e.target.id==="coProb")$("coReqBox").hidden=!e.target.value.trim()});
+$("checkPanel").addEventListener("click",e=>{
+  if(e.target.id==="ciGo"){S.log.push({id:uid(),who:ME,d:TODAY,in:nowMin(),out:null,purpose:$("ciPurpose").value,detail:$("ciDetail").value.trim(),done:"",fu:"",prob:""});render();toast("Checked in")}
+  if(e.target.id==="coGo"){const o=openEntry(ME);o.out=Math.max(nowMin(),o.in);o.done=document.querySelector("input[name=coDone]:checked").value;
+    o.fu=$("coFu").value.trim();o.prob=$("coProb").value.trim();
+    if(o.prob&&$("coMake").checked){const r={id:uid(),date:DATES[TODAY],by:ME,loc:$("coLoc").value.trim()||"Not given",issue:o.prob,pri:"Routine",status:"Open",wo:""};S.reqs.push(r);o.req=r.id}
+    render();toast(o.req?"Checked out. Service request created.":"Checked out")}});
+
+/* ---------- service requests ---------- */
+function reqForm(by){return `<div class="form"><label class="full">Location<input id="rqLoc" placeholder="Deck, room, or area"></label>
+  <label class="full">What's wrong?<textarea id="rqIssue" placeholder="Describe the problem"></textarea></label>
+  <label>Priority<select id="rqPri"><option>Routine</option><option>Urgent</option><option>Emergency</option></select></label>
+  <label>Submitted by<select id="rqBy">${[CHIEF].concat(PEOPLE).map(p=>`<option ${p===by?"selected":""}>${p}</option>`).join("")}</select></label></div>
+  <div class="why">For anything unsafe (flooding, sparking, gas smell) call the base trouble desk first, then log it here.</div>`}
+function newReq(){openModal("New service request","",reqForm(role==="chief"?CHIEF:ME),`<span></span><div class="row" style="gap:8px"><button class="btn" data-act="cancel">Cancel</button><button class="btn primary" data-act="saveReq">Submit</button></div>`)}
+$("quickReq").onclick=newReq;
+$("dlgAct").addEventListener("click",e=>{const a=e.target.dataset.act;
+  if(a==="saveReq"){const issue=$("rqIssue").value.trim();if(!issue){$("rqIssue").focus();toast("Describe the problem first");return}
+    S.reqs.push({id:uid(),date:DATES[TODAY],by:$("rqBy").value,loc:$("rqLoc").value.trim()||"Not given",issue,pri:$("rqPri").value,status:"Open",wo:""});closeModal();render();toast("Service request submitted")}
+  if(a==="saveWatch")saveWatch()});
+function reqText(r){return `SERVICE REQUEST\nLocation: ${r.loc}\nProblem: ${r.issue}\nPriority: ${r.pri}\nReported by: ${r.by}, ${r.date}\nPOC: ${CHIEF}`}
+function copy(t,msg){const done=()=>toast(msg);try{navigator.clipboard.writeText(t).then(done,()=>fallback(t,msg))}catch(e){fallback(t,msg)}}
+function fallback(t,msg){openModal("Copy this text","Select all and copy.",`<textarea style="min-height:160px">${esc(t)}</textarea>`,`<span></span><button class="btn" data-act="cancel">Close</button>`);$("dlgBody").querySelector("textarea").select()}
+function drawReqs(){const chief=role==="chief";const rs=[...S.reqs].sort((a,b)=>(a.status==="Closed")-(b.status==="Closed")||b.date.localeCompare(a.date));
+  const counts=STATUSES.map(s=>`<span class="chip ${s==="Open"?"warn":s==="Closed"?"ok":""}">${s}: ${S.reqs.filter(r=>r.status===s).length}</span>`).join(" ");
+  $("s-reqs").innerHTML=`<div class="row"><div><h2>Service requests</h2><div class="row" style="justify-content:flex-start;gap:6px;margin-top:6px">${counts}</div></div><button class="btn primary" data-q="new">+ New request</button></div>
+  <div class="scroll"><table class="tbl"><tr><th>Date</th><th>Location</th><th>Problem</th><th>Priority</th><th>By</th><th>Status</th><th>Work order</th>${chief?"<th></th>":""}</tr>
+  ${rs.map(r=>`<tr><td class="mono">${r.date.slice(5)}</td><td>${esc(r.loc)}</td><td>${esc(r.issue)}</td><td>${r.pri==="Routine"?r.pri:`<span class="chip warn">${r.pri}</span>`}</td><td>${esc(r.by)}</td>
+   <td>${chief?`<select data-st="${r.id}">${STATUSES.map(s=>`<option ${s===r.status?"selected":""}>${s}</option>`).join("")}</select>`:`<span class="chip ${r.status==="Open"?"warn":r.status==="Closed"?"ok":""}">${r.status}</span>`}</td>
+   <td>${chief?`<input data-wo="${r.id}" value="${esc(r.wo)}" placeholder="WO #" style="width:100px">`:esc(r.wo)||"<span class='why'>none</span>"}</td>
+   ${chief?`<td><button class="btn small" data-cp="${r.id}">Copy for trouble call</button></td>`:""}</tr>`).join("")}</table></div>
+  ${chief?`<div class="why">"Copy for trouble call" copies a formatted request you can paste into the official Public Works system or an email. Record their work order number here to track it.</div>`:""}`}
+$("s-reqs").addEventListener("click",e=>{if(e.target.dataset.q==="new")newReq();const c=e.target.dataset.cp;if(c)copy(reqText(S.reqs.find(r=>r.id===c)),"Copied. Paste it into the trouble call system.")});
+$("s-reqs").addEventListener("change",e=>{const st=e.target.dataset.st,wo=e.target.dataset.wo;
+  if(st){S.reqs.find(r=>r.id===st).status=e.target.value;render()}
+  if(wo){S.reqs.find(r=>r.id===wo).wo=e.target.value.trim();save()}});
+
+/* ---------- chief: watch bill ---------- */
+let sel=null,chosen=new Set();
+const standersAt=(d,i)=>[...new Set(S.asg.filter(x=>x.d===d&&i>=x.s&&i<x.e).map(x=>x.who))];
+const whoIn=(d,i)=>PEOPLE.filter(n=>has(n,d+"-"+i));
+function drawPick(){$("pickRow").innerHTML=`<button class="pk" aria-pressed="${!chosen.size}" data-n="">Suggest for me</button>`+PEOPLE.map(n=>`<button class="pk" aria-pressed="${chosen.has(n)}" data-n="${n}">${n}</button>`).join("")}
+$("pickRow").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;const n=b.dataset.n;
+  if(!n)chosen.clear();else chosen.has(n)?chosen.delete(n):chosen.add(n);drawPick()});
 function drawHeat(){let html=head();
   SLOTS.forEach((m,i)=>{html+="<tr><th class='t'>"+(m%60?"":fmt(m))+"</th>";
-    DAYS.forEach((_,d)=>{const c=whoIn(d,i).length;const cls=c===0?"gap":"l"+Math.min(c,4);
-      const s=sel&&sel.d===d&&i>=sel.s&&i<sel.e?" sel":"";
-      const w=watchAt(d,i)?" w":"";
-      html+=`<td class="${cls}${s}${w}" data-d="${d}" data-i="${i}" tabindex="0" aria-label="${DAYS[d]} ${fmt(m)}, ${c} in building">${c||"0"}</td>`});
-    html+="</tr>"});
+    DAYS.forEach((_,d)=>{const c=whoIn(d,i).length,w=standersAt(d,i).length;
+      const cls=(c===0?"gap":"l"+Math.min(c,4))+(sel&&sel.d===d&&i>=sel.s&&i<sel.e?" sel":"")+(w?" w":"")+(w>1?" w2":"");
+      html+=`<td class="${cls}" data-d="${d}" data-i="${i}" tabindex="0" aria-label="${DAYS[d]} ${fmt(m)}, ${c} in building, ${w} on watch">${c}</td>`});html+="</tr>"});
   $("heatGrid").innerHTML=html}
+function drawBill(){drawPick();drawHeat();
+  $("allAsg").innerHTML=S.asg.length?S.asg.map(x=>`<li><span><b>${x.who}</b></span><span class="mono">${DAYS[x.d].slice(0,3)} ${span(x)} · ${doneCount(x)}/${S.tmpl.length}</span></li>`).join(""):"<li class='empty'>No watches yet.</li>"}
 let drag=null;const hg=$("heatGrid");
 function hcell(e){const el=document.elementFromPoint(e.clientX,e.clientY);return el&&el.closest?el.closest("#heatGrid td"):null}
-hg.addEventListener("pointerdown",e=>{const td=hcell(e);if(!td)return;e.preventDefault();hg.setPointerCapture(e.pointerId);
-  const d=+td.dataset.d,i=+td.dataset.i;drag={d,a:i};sel={d,s:i,e:i+1};drawHeat()});
-hg.addEventListener("pointermove",e=>{if(!drag)return;const td=hcell(e);if(!td)return;const i=+td.dataset.i;
-  const s=Math.min(drag.a,i),en=Math.max(drag.a,i)+1;if(s!==sel.s||en!==sel.e){sel={d:drag.d,s,e:en};drawHeat()}});
-const hend=()=>{if(!drag)return;drag=null;openDlg()};
-hg.addEventListener("pointerup",hend);hg.addEventListener("pointercancel",hend);
-hg.addEventListener("keydown",e=>{if(e.key==="Enter"){const td=e.target.closest("td");if(td){const i=+td.dataset.i;sel={d:+td.dataset.d,s:i,e:i+1};drawHeat();openDlg()}}});
-function openDlg(){const {d,s,e}=sel;pick(d,s);
-  const win=`${DAYS[d]}, ${fmt(SLOTS[s])}-${fmt(SLOTS[e-1]+30)}`;
-  $("dlgT").textContent=stander?`Assign ${stander} the watch?`:`Watch: ${win}`;
-  const cur=[...new Set(asg.filter(x=>x.d===d&&x.s<e&&x.e>s).map(x=>x.who))];
-  $("dlgSub").textContent=(stander?win+". ":"")+(cur.length?"Currently on watch: "+cur.join(", "):"No watch assigned in this window.");
-  $("dlgClear").hidden=!cur.length;if(stander)single();else suggest();$("modal").hidden=false;$("dlgCancel").focus()}
-let stander=null;
-function drawPick(){$("pickRow").innerHTML=[""].concat(people.map(p=>p.n)).map(n=>`<button class="pk" aria-pressed="${n===(stander||"")}" data-n="${n}">${n||"Suggest for me"}</button>`).join("")}
-$("pickRow").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;stander=b.dataset.n||null;drawPick()});
-function cut(d,s,e){const out=[];asg.forEach(x=>{if(x.d!==d||x.e<=s||x.s>=e){out.push(x);return}if(x.s<s)out.push({...x,e:s});if(x.e>e)out.push({...x,s:e})});asg=out}
-function assignWatch(who,d,s,e){cut(d,s,e);asg.push({who,d,s,e});asg.sort((a,b)=>a.d-b.d||a.s-b.s);monthCount[who]=(monthCount[who]||0)+1}
-function single(){const {d,s,e}=sel,n=e-s;let c=0;for(let i=s;i<e;i++)if(avail[stander].has(d+"-"+i))c++;
-  const st=c===n?'<span class="chip">In the building the whole time</span>':c?`<span class="chip warn">In the building ${c} of ${n} half hours</span>`:'<span class="chip warn">Not in the building then</span>';
-  const rep=[...new Set(asg.filter(x=>x.d===d&&x.s<e&&x.e>s&&x.who!==stander).map(x=>x.who))];
-  $("cands").innerHTML=`<li class="cand best"><div><b>${stander}</b><div class="why" style="margin-top:4px">${st}</div>${rep.length?`<div class="why">Replaces ${rep.join(", ")} for this window</div>`:""}</div><button class="btn small primary" data-who="${stander}">Assign</button></li>`}
-function closeDlg(){$("modal").hidden=true;sel=null;drawHeat()}
-$("dlgCancel").onclick=closeDlg;
-$("modal").addEventListener("click",e=>{if(e.target.id==="modal")closeDlg()});
-$("dlgClear").onclick=()=>{const {d,s,e}=sel;cut(d,s,e);closeDlg();drawAll();toast("Watch removed")};
-document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("modal").hidden)closeDlg()});
-function pick(d,i){const w=whoIn(d,i);
-  $("slotInfo").innerHTML=`<b>${DAYS[d]} ${fmt(SLOTS[i])}</b>: `+(w.length?w.join(", "):"<span style='color:var(--warn)'>nobody in the building</span>")+"<br>Watch: "+(watchAt(d,i)?"<b>"+watchAt(d,i)+"</b>":"<span style='color:var(--warn)'>not assigned</span>");}
+hg.addEventListener("pointerdown",e=>{const td=hcell(e);if(!td)return;e.preventDefault();hg.setPointerCapture(e.pointerId);const d=+td.dataset.d,i=+td.dataset.i;drag={d,a:i};sel={d,s:i,e:i+1};drawHeat()});
+hg.addEventListener("pointermove",e=>{if(!drag)return;const td=hcell(e);if(!td)return;const i=+td.dataset.i,s=Math.min(drag.a,i),en=Math.max(drag.a,i)+1;if(s!==sel.s||en!==sel.e){sel={d:drag.d,s,e:en};drawHeat()}});
+const hend=()=>{if(!drag)return;drag=null;openAssign()};hg.addEventListener("pointerup",hend);hg.addEventListener("pointercancel",hend);
+hg.addEventListener("keydown",e=>{if(e.key==="Enter"){const td=e.target.closest("td");if(td){const i=+td.dataset.i;sel={d:+td.dataset.d,s:i,e:i+1};drawHeat();openAssign()}}});
+function openAssign(){const {d,s,e}=sel,n=e-s;
+  const w=whoIn(d,s),st=standersAt(d,s);
+  $("slotInfo").innerHTML=`<b>${DAYS[d]} ${fmt(SLOTS[s])}</b>: ${w.length?w.join(", "):"<span style='color:var(--warn)'>nobody in the building</span>"}<br>Watch: ${st.length?"<b>"+st.join(", ")+"</b>":"<span style='color:var(--warn)'>not assigned</span>"}`;
+  const onNow=new Set(S.asg.filter(x=>x.d===d&&x.s<e&&x.e>s).map(x=>x.who));
+  const rows=PEOPLE.map(p=>{let c=0;for(let i=s;i<e;i++)if(has(p,d+"-"+i))c++;
+    return {p,c,score:(c===n?100:c/n*40)-(S.month[p]||0)*6+(onNow.has(p)?200:0)+(chosen.has(p)?300:0)}}).filter(r=>r.c>0||onNow.has(r.p)||chosen.has(r.p)).sort((a,b)=>b.score-a.score);
+  const pre=new Set([...onNow,...chosen]);if(!pre.size&&rows.length&&rows[0].c===n)pre.add(rows[0].p);
+  const body=rows.length?rows.map(r=>{const status=r.c===n?'<span class="chip ok">In the whole time</span>':r.c?`<span class="chip warn">In ${r.c} of ${n} half hours</span>`:'<span class="chip warn">Not in the building</span>';
+    return `<label class="cand"><input type="checkbox" value="${r.p}" ${pre.has(r.p)?"checked":""}><div class="item"><b>${r.p}</b><div class="row" style="justify-content:flex-start;gap:6px">${status}${onNow.has(r.p)?'<span class="chip gold">On watch now</span>':""}<span class="why">${S.month[r.p]||0} watches this month</span></div></div></label>`}).join("")
+    :"<div class='empty'>Nobody is in the building then. Tap names above the chart to assign someone anyway.</div>";
+  openModal(`Watch: ${DAYS[d]}, ${fmt(SLOTS[s])}-${fmt(SLOTS[e-1]+30)}`,"Check everyone who should stand this watch.",body,
+    `<span class="why" id="wCount"></span><div class="row" style="gap:8px"><button class="btn" data-act="cancel">Cancel</button><button class="btn primary" data-act="saveWatch">Save watch</button></div>`);
+  updCount()}
+function updCount(){const k=$("dlgBody").querySelectorAll(".cand input:checked").length;if($("wCount"))$("wCount").textContent=k?`${k} on watch`:"Nobody on watch"}
+$("dlgBody").addEventListener("change",updCount);
+function cutPerson(p,d,s,e){const out=[];S.asg.forEach(x=>{if(x.who!==p||x.d!==d||x.e<=s||x.s>=e){out.push(x);return}if(x.s<s)out.push({...x,e:s});if(x.e>e)out.push({...x,id:uid(),s:e})});S.asg=out}
+function saveWatch(){const {d,s,e}=sel;const picked=[...$("dlgBody").querySelectorAll(".cand input:checked")].map(i=>i.value);
+  const before=new Set(S.asg.filter(x=>x.d===d&&x.s<e&&x.e>s).map(x=>x.who));
+  before.forEach(p=>{if(!picked.includes(p))cutPerson(p,d,s,e)});
+  picked.forEach(p=>{const isNew=!before.has(p);cutPerson(p,d,s,e);S.asg.push({id:uid(),who:p,d,s,e});if(isNew)S.month[p]=(S.month[p]||0)+1});
+  S.asg.sort((a,b)=>a.d-b.d||a.s-b.s||a.who.localeCompare(b.who));sel=null;$("modal").hidden=true;render();
+  toast(picked.length?`Watch set: ${picked.join(", ")} (demo)`:"Watch cleared")}
 
-/* ---------- Suggestion algorithm ---------- */
-function fillSelects(){$("fDay").innerHTML=DAYS.map((d,i)=>`<option value="${i}">${d}</option>`).join("");
-  $("fStart").innerHTML=SLOTS.map((m,i)=>`<option value="${i}">${fmt(m)}</option>`).join("");
-  $("fEnd").innerHTML=SLOTS.map((m,i)=>`<option value="${i+1}">${fmt(m+30)}</option>`).join("");
-  $("fDay").value=2;$("fStart").value=0;$("fEnd").value=8}
-function suggest(){if(!sel)return;const d=sel.d,s=sel.s,e=sel.e;
-  const scored=people.map(p=>{let cover=0;for(let i=s;i<e;i++)if(avail[p.n].has(d+"-"+i))cover++;
-    const full=cover===e-s,busy=asg.some(x=>x.who===p.n&&x.d===d&&x.s<e&&x.e>s);
-    const score=(full?100:cover/(e-s)*40)-(monthCount[p.n]||0)*6-(busy?80:0);
-    return {p,cover,full,busy,score}}).filter(x=>x.cover>0).sort((a,b)=>b.score-a.score).slice(0,4);
-  if(!scored.length){$("cands").innerHTML=`<li class="cand"><span class="why">Nobody is in the building then. Pick another window or assign the watch directly.</span></li>`;return}
-  $("cands").innerHTML=scored.map((x,k)=>{const why=[x.full?"In the whole window":`In ${x.cover} of ${e-s} slots`,
-      `${monthCount[x.p.n]||0} watches this month`];
-    return `<li class="cand ${k===0?"best":""}"><div><b>${x.p.n}</b>${k===0?' <span class="chip">Best fit</span>':""}${x.busy?' <span class="chip warn">Already on watch</span>':""}<div class="why">${why.join(" · ")}</div></div>
-      <button class="btn small ${k===0?"primary":""}" data-who="${x.p.n}">Assign</button></li>`}).join("")}
-$("cands").addEventListener("click",e=>{const b=e.target.closest("button[data-who]");if(!b)return;
-  const d=sel.d,s=sel.s,en=sel.e;closeDlg();
-  assignWatch(b.dataset.who,d,s,en);
-  drawAll();toast(`Watch assigned to ${b.dataset.who} (demo)`)});
+/* ---------- chief: building log ---------- */
+function followups(){return S.log.filter(l=>l.out!=null&&!l.fuClosed&&(l.done==="No"||l.done==="Partly"||l.fu||(l.prob&&!l.req)))}
+function drawLog(){const open=S.log.filter(l=>l.d===TODAY&&l.out==null);$("nowCount").textContent=open.length;$("nowListC").innerHTML=nowListHTML();
+  const fu=followups();
+  $("fuList").innerHTML=fu.length?fu.map(l=>`<li><div class="item"><b>${esc(l.who)}</b><span class="why">${DAYS[l.d]} · ${esc(l.detail||l.purpose)} · done: ${l.done}</span>
+    ${l.fu?`<span>Follow-up: ${esc(l.fu)}</span>`:""}${l.prob&&!l.req?`<span>Problem: ${esc(l.prob)}</span>`:""}</div>
+    <div class="row" style="gap:6px">${l.prob&&!l.req?`<button class="btn small" data-mk="${l.id}">Make request</button>`:""}<button class="btn small" data-res="${l.id}">Resolved</button></div></li>`).join(""):"<li class='empty'>Nothing waiting.</li>";
+  const rows=[...S.log].sort((a,b)=>b.d-a.d||b.in-a.in);
+  $("logTbl").innerHTML=`<tr><th>Day</th><th>Name</th><th>In</th><th>Out</th><th>Here for</th><th>Done?</th><th>Follow-up / problems</th></tr>`+rows.map(l=>`<tr><td class="mono">${DAYS[l.d].slice(0,3)}</td><td>${esc(l.who)}</td><td class="mono">${fmt(l.in)}</td><td class="mono">${l.out==null?'<span class="chip">in now</span>':fmt(l.out)}</td>
+    <td>${esc(l.purpose)}${l.detail?`<div class="why">${esc(l.detail)}</div>`:""}</td><td>${l.done?`<span class="chip ${l.done==="Yes"?"ok":"warn"}">${l.done}</span>`:""}</td>
+    <td>${l.fu?esc(l.fu):""}${l.prob?`<div class="why">Problem: ${esc(l.prob)}${l.req?" (request logged)":""}</div>`:""}</td></tr>`).join("")}
+$("s-log").addEventListener("click",e=>{const r=e.target.dataset.res,m=e.target.dataset.mk;
+  if(r){S.log.find(l=>l.id===r).fuClosed=1;render();toast("Marked resolved")}
+  if(m){const l=S.log.find(x=>x.id===m);const q={id:uid(),date:DATES[TODAY],by:l.who,loc:"See problem",issue:l.prob,pri:"Routine",status:"Open",wo:""};S.reqs.push(q);l.req=q.id;render();toast("Service request created")}});
 
-function drawAll(){drawPaint();drawHeat();suggest();
-  $("allAsg").innerHTML=asg.map(x=>`<li><span><b>${x.who}</b></span><span class="mono">${DAYS[x.d].slice(0,3)} ${span(x)}</span></li>`).join("")}
+/* ---------- chief: checklist ---------- */
+function drawCheck(){$("tmplList").innerHTML=S.tmpl.map((t,k)=>`<li><span>${esc(t)}</span><button class="btn small" data-del="${k}" aria-label="Remove ${esc(t)}">Remove</button></li>`).join("")||"<li class='empty'>No duties yet.</li>";
+  $("compList").innerHTML=S.asg.length?S.asg.map(w=>{const n=doneCount(w),T=S.tmpl.length,pct=T?Math.round(n/T*100):0;const past=w.d<TODAY;
+    return `<div class="item" style="gap:5px"><div class="row"><span><b>${w.who}</b> <span class="mono">${DAYS[w.d]} ${span(w)}</span></span><span class="chip ${n===T?"ok":past?"warn":""}">${n}/${T}${past&&n<T?" missed":""}</span></div><div class="bar"><i style="width:${pct}%"></i></div></div>`}).join(""):"<div class='empty'>No watches yet.</div>"}
+$("tmplList").addEventListener("click",e=>{const k=e.target.dataset.del;if(k!=null){S.tmpl.splice(+k,1);render()}});
+const addDuty=()=>{const v=$("tmplNew").value.trim();if(!v)return;S.tmpl.push(v);$("tmplNew").value="";render()};
+$("tmplAdd").onclick=addDuty;$("tmplNew").addEventListener("keydown",e=>{if(e.key==="Enter")addDuty()});
 
-/* ---------- View toggle ---------- */
-function view(v){$("sailor").hidden=v!=="sailor";$("chief").hidden=v!=="chief";
-  $("vSailor").setAttribute("aria-pressed",v==="sailor");$("vChief").setAttribute("aria-pressed",v==="chief");drawAll()}
-$("vSailor").onclick=()=>view("sailor");$("vChief").onclick=()=>view("chief");
-drawPick();view(location.hash==="#chief"?"chief":"sailor");
+/* ---------- chief: reports ---------- */
+function range(){const f=$("rFrom").value,t=$("rTo").value;return DATES.map((x,i)=>x>=f&&x<=t?i:-1).filter(i=>i>=0)}
+function manpower(){const ds=range();
+  return PEOPLE.map(p=>{let planned=0;ds.forEach(d=>SLOTS.forEach((_,i)=>{if(has(p,d+"-"+i))planned+=.5}));
+    const logs=S.log.filter(l=>l.who===p&&ds.includes(l.d));const logged=logs.reduce((a,l)=>a+((l.out??nowMin())-l.in)/60,0);
+    const ws=S.asg.filter(x=>x.who===p&&ds.includes(x.d));const wh=ws.reduce((a,x)=>a+(x.e-x.s)/2,0);
+    const cd=ws.reduce((a,x)=>a+doneCount(x),0),ct=ws.length*S.tmpl.length;
+    const reqs=S.reqs.filter(r=>r.by===p&&ds.some(d=>DATES[d]===r.date)).length;
+    return {Name:p,"Planned hrs":planned,"Check-ins":logs.length,"Logged hrs":+logged.toFixed(1),"Watches":ws.length,"Watch hrs":wh,"Checklist":ct?`${cd}/${ct}`:"",Requests:reqs}})}
+function drawReports(){const m=manpower(),cols=Object.keys(m[0]);
+  const tot=c=>m.reduce((a,r)=>a+(typeof r[c]==="number"?r[c]:0),0);
+  $("repTbl").innerHTML=`<tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr>`+m.map(r=>`<tr>${cols.map((c,k)=>`<td class="${k?"n":""}">${r[c]}</td>`).join("")}</tr>`).join("")+
+    `<tr>${cols.map((c,k)=>`<td class="${k?"n":""}"><b>${k===0?"Total":(c==="Checklist"?"":+tot(c).toFixed(1))}</b></td>`).join("")}</tr>`}
+["rFrom","rTo"].forEach(id=>$(id).addEventListener("change",drawReports));
+const csv=rows=>{const cols=Object.keys(rows[0]||{});return [cols.join(",")].concat(rows.map(r=>cols.map(c=>`"${String(r[c]??"").replace(/"/g,'""')}"`).join(","))).join("\n")};
+function dataset(k){const ds=range();
+  if(k==="man")return manpower();
+  if(k==="log")return S.log.filter(l=>ds.includes(l.d)).map(l=>({Date:DATES[l.d],Name:l.who,In:fmt(l.in),Out:l.out==null?"":fmt(l.out),"Here for":l.purpose,Detail:l.detail,Done:l.done,"Follow-up":l.fu,Problems:l.prob}));
+  return S.reqs.filter(r=>ds.some(d=>DATES[d]===r.date)).map(r=>({Date:r.date,Location:r.loc,Problem:r.issue,Priority:r.pri,By:r.by,Status:r.status,"Work order":r.wo}))}
+$("s-reports").addEventListener("click",e=>{const k=e.target.dataset.csv,c=e.target.dataset.copy;
+  if(k){const rows=dataset(k);if(!rows.length){toast("Nothing in that date range");return}
+    const name=`${{man:"manpower",log:"building-log",req:"service-requests"}[k]}_${$("rFrom").value}_to_${$("rTo").value}.csv`;
+    try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv(rows)],{type:"text/csv"}));a.download=name;document.body.appendChild(a);a.click();a.remove();toast("Downloaded "+name)}catch(err){copy(csv(rows),"Copied as CSV")}}
+  if(c)copy(csv(dataset("man")).replace(/","/g,"\t").replace(/^"|"$/gm,""),"Copied. Paste into Excel or Sheets.")});
+
+/* ---------- start ---------- */
+$("resetAll").onclick=()=>{S=sample();chosen.clear();render();toast("Sample data restored")};
+setRole(location.hash==="#chief"?"chief":"sailor");
 </script>
 
 </html>
