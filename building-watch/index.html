@@ -63,6 +63,13 @@ table.grid{border-collapse:separate;border-spacing:3px;width:100%;min-width:520p
 #paintGrid,#heatGrid{touch-action:none;user-select:none;-webkit-user-select:none}
 #paintGrid td{cursor:crosshair}
 #paintGrid td.on{background:var(--paint)}
+.busy,#paintGrid td.busy{background-image:repeating-linear-gradient(135deg,var(--muted) 0 2px,transparent 2px 6px);background-color:var(--h0)}
+#paintGrid td.busy.on{background-color:var(--paint)}
+#paintGrid td .ev{position:absolute;left:4px;top:3px;font:500 .62rem var(--f-mono);color:var(--ink);background:var(--surface);padding:0 3px;border-radius:3px;white-space:nowrap;pointer-events:none;max-width:calc(100% - 8px);overflow:hidden;text-overflow:ellipsis;z-index:1}
+.kv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.addrow{grid-template-columns:2fr 2fr 1fr auto;align-items:end}
+@media (max-width:600px){.addrow{grid-template-columns:1fr 1fr}}
+.copybox{display:flex;gap:6px}.copybox input{font-family:var(--f-mono);font-size:.78rem}
 #paintGrid td.asg::after{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--accent)}
 #heatGrid td{cursor:pointer;text-align:center;font:500 .72rem var(--f-mono);color:var(--ink)}
 #heatGrid td.l1{background:var(--h1)} #heatGrid td.l2{background:var(--h2)}
@@ -121,6 +128,7 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
       <div class="eyebrow">Facilities · Prototype · Sample data</div>
       <h1>Building Watch</h1>
       <p class="sub">Week of November 2, 2026 · demo "today" is Wed 11/4</p>
+      <p class="sub" id="incharge"></p>
     </div>
     <div class="hright">
       <button class="btn primary" id="quickReq">+ Service request</button>
@@ -148,7 +156,9 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
       <div class="legend">
         <span><span class="sw" style="background:var(--paint)"></span>In the building</span>
         <span><span class="sw" style="background:var(--accent);border-radius:50%"></span>You have the watch</span>
+        <span><span class="sw busy"></span>Already on your calendar</span>
       </div>
+      <div class="why" id="calNote"></div>
     </div>
     <div class="panel"><h2>My watches</h2><div class="sub" style="margin-top:-8px">Check off duties as you complete them.</div><div class="stack" id="myWatches"></div></div>
   </section>
@@ -224,6 +234,12 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
     </div>
   </section>
 
+  <!-- SAILOR: MY SETTINGS -->
+  <section id="s-mine" class="cols2"></section>
+
+  <!-- CHIEF: ADMIN -->
+  <section id="s-admin" class="stack"></section>
+
   <p class="note">Prototype only. Names, schedules and requests are sample data and stay in this browser. In the live version this runs on a shared Google account: painted time writes to the "In the Building" calendar, watches go out as private invites, and requests and the maintenance log save to a shared sheet. <button class="btn link" id="resetAll">Reset sample data</button></p>
 </div>
 
@@ -242,7 +258,8 @@ const TODAY=2;
 const SLOTS=[];for(let m=7*60+30;m<16*60;m+=30)SLOTS.push(m);
 const fmt=m=>String(Math.floor(m/60)).padStart(2,"0")+String(m%60).padStart(2,"0");
 const ME="MU1 Demy", CHIEF="Senior Chief";
-const PEOPLE=["MU1 Demy","MUC Alvarez","MU2 Brooks","MU1 Chen","MU3 Okafor","MU2 Patel","MU1 Reyes","MU2 Walsh"];
+const BASE_PEOPLE=["MU1 Demy","MUC Alvarez","MU2 Brooks","MU1 Chen","MU3 Okafor","MU2 Patel","MU1 Reyes","MU2 Walsh"];
+let PEOPLE=BASE_PEOPLE.slice();
 const STATUSES=["Open","Submitted to PW","In progress","Closed"];
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -252,7 +269,7 @@ const nowMin=()=>{const d=new Date();return d.getHours()*60+d.getMinutes()};
 
 /* ---------- sample data ---------- */
 function sample(){
-  const avail={};PEOPLE.forEach(n=>avail[n]={});
+  const avail={};BASE_PEOPLE.forEach(n=>avail[n]={});
   const h=x=>Math.floor(x)*60+(x%1?30:0);
   const block=(n,d,a,b)=>SLOTS.forEach((m,i)=>{if(m>=h(a)&&m<h(b))avail[n][d+"-"+i]=1});
   [[0,8,12],[1,8,15.5],[3,9,13]].forEach(r=>block("MU1 Demy",...r));
@@ -263,8 +280,13 @@ function sample(){
   [[2,8,12],[3,12,16]].forEach(r=>block("MU2 Patel",...r));
   [[0,7.5,10],[3,8,16],[4,12,16]].forEach(r=>block("MU1 Reyes",...r));
   [[1,9,13],[2,7.5,9.5]].forEach(r=>block("MU2 Walsh",...r));
+  const mail=n=>n.split(" ").pop().toLowerCase()+".navyband@example.mil";
   return {
     avail,
+    staff:[{n:CHIEF,email:"seniorchief.navyband@example.mil",role:"Admin",watch:false}].concat(BASE_PEOPLE.map(n=>({n,email:mail(n),role:n==="MUC Alvarez"?"Admin":"Member",watch:true}))),
+    settings:{calName:"Facilities: In the Building",calId:"facilities.inbuilding@group.calendar.google.com",invites:true,remind:"30",manager:CHIEF,acting:{who:"",from:"",to:""},mailLog:[]},
+    myCals:{"MU1 Demy":[{label:"My Google Calendar",url:"richard.demy@gmail.com",on:true}]},
+    personal:{"MU1 Demy":[{d:0,s:0,e:2,t:"PT"},{d:1,s:11,e:13,t:"Dentist"},{d:3,s:10,e:15,t:"Ceremony rehearsal"},{d:4,s:2,e:6,t:"Teaching, NOVA"}]},
     asg:[{id:"a1",who:"MUC Alvarez",d:0,s:0,e:8},{id:"a2",who:"MU2 Brooks",d:0,s:8,e:12},{id:"a3",who:"MU1 Reyes",d:0,s:0,e:5},
          {id:"a4",who:"MU1 Chen",d:1,s:0,e:7},{id:"a5",who:"MU1 Demy",d:1,s:8,e:14},{id:"a6",who:"MUC Alvarez",d:2,s:0,e:8}],
     month:{"MUC Alvarez":3,"MU2 Brooks":1,"MU1 Demy":1,"MU1 Chen":2,"MU3 Okafor":0,"MU2 Patel":0,"MU1 Reyes":2,"MU2 Walsh":1},
@@ -288,23 +310,27 @@ function sample(){
   };
 }
 let S;
-function load(){try{const t=localStorage.getItem("bw-v3");if(t){S=JSON.parse(t);return}}catch(e){}S=sample()}
-function save(){try{localStorage.setItem("bw-v3",JSON.stringify(S))}catch(e){}}
-load();
+function load(){try{const t=localStorage.getItem("bw-v4");if(t){S=JSON.parse(t);return}}catch(e){}S=sample()}
+function save(){try{localStorage.setItem("bw-v4",JSON.stringify(S))}catch(e){}}
+function syncPeople(){PEOPLE=S.staff.filter(s=>s.watch).map(s=>s.n);S.staff.forEach(s=>{S.avail[s.n]=S.avail[s.n]||{}})}
+load();syncPeople();
 
 /* ---------- shell ---------- */
 let role="sailor",tab="week";
-const TABS={sailor:[["week","My week"],["log","Maintenance log"],["reqs","Service requests"]],
-            chief:[["bill","Watch bill"],["log","Maintenance log"],["check","Watch checklist"],["reqs","Service requests"],["reports","Reports"]]};
-const SECTIONS=["week","reqs","bill","log","check","reports"];
+const TABS={sailor:[["week","My week"],["log","Maintenance log"],["reqs","Service requests"],["mine","My settings"]],
+            chief:[["bill","Watch bill"],["log","Maintenance log"],["check","Watch checklist"],["reqs","Service requests"],["reports","Reports"],["admin","Admin"]]};
+const SECTIONS=["week","reqs","bill","log","check","reports","mine","admin"];
 function toast(t){const e=$("toast");e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2400)}
 function badges(){const open=S.reqs.filter(r=>r.status==="Open").length;const fu=followups().length;return {reqs:role==="chief"?open:0,log:fu}}
 function drawTabs(){const b=badges();$("tabs").innerHTML=TABS[role].map(([k,l])=>`<button role="tab" aria-selected="${k===tab}" data-tab="${k}">${l}${b[k]?`<span class="badge">${b[k]}</span>`:""}</button>`).join("")}
 $("tabs").addEventListener("click",e=>{const b=e.target.closest("[data-tab]");if(b){tab=b.dataset.tab;render()}});
 function setRole(r){role=r;tab=TABS[r][0][0];$("vSailor").setAttribute("aria-pressed",r==="sailor");$("vChief").setAttribute("aria-pressed",r==="chief");render()}
 $("vSailor").onclick=()=>setRole("sailor");$("vChief").onclick=()=>setRole("chief");
-function render(){save();drawTabs();SECTIONS.forEach(k=>$("s-"+k).hidden=k!==tab);
-  ({week:drawWeek,reqs:drawReqs,bill:drawBill,log:drawLog,check:drawCheck,reports:drawReports})[tab]()}
+function inCharge(){const a=S.settings.acting,t=DATES[TODAY];return a.who&&(!a.from||a.from<=t)&&(!a.to||a.to>=t)?a.who:S.settings.manager}
+function drawHeader(){const a=S.settings.acting,ic=inCharge();
+  $("incharge").innerHTML=`Building manager: <b>${esc(S.settings.manager)}</b>`+(ic!==S.settings.manager?` · In charge now: <b>${esc(ic)}</b> (acting${a.to?" through "+a.to.slice(5).replace("-","/"):""})`:"")}
+function render(){save();syncPeople();drawTabs();drawHeader();SECTIONS.forEach(k=>$("s-"+k).hidden=k!==tab);
+  ({week:drawWeek,mine:drawMine,admin:drawAdmin,reqs:drawReqs,bill:drawBill,log:drawLog,check:drawCheck,reports:drawReports})[tab]()}
 function head(){return "<tr><th class='t'></th>"+DAYS.map(d=>"<th>"+d+"</th>").join("")+"</tr>"}
 
 /* ---------- modal ---------- */
@@ -317,11 +343,14 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("modal").hidden)
 /* ---------- sailor: my week ---------- */
 $("meName").textContent=ME;
 const has=(n,k)=>!!S.avail[n][k];
+const calsOn=n=>(S.myCals[n]||[]).filter(c=>c.on);
+function busyAt(n,d,i){if(!calsOn(n).length)return null;return (S.personal[n]||[]).find(x=>x.d===d&&i>=x.s&&i<x.e)||null}
 function drawPaint(){const mine=S.avail[ME];let html=head();
   SLOTS.forEach((m,i)=>{html+="<tr><th class='t'>"+(m%60?"":fmt(m))+"</th>";
-    DAYS.forEach((_,d)=>{const on=mine[d+"-"+i],a=S.asg.some(x=>x.who===ME&&x.d===d&&i>=x.s&&i<x.e);
-      html+=`<td data-k="${d}-${i}" class="${on?"on":""} ${a?"asg":""}" aria-label="${DAYS[d]} ${fmt(m)}"></td>`});html+="</tr>"});
-  $("paintGrid").innerHTML=html}
+    DAYS.forEach((_,d)=>{const on=mine[d+"-"+i],a=S.asg.some(x=>x.who===ME&&x.d===d&&i>=x.s&&i<x.e),b=busyAt(ME,d,i);
+      html+=`<td data-k="${d}-${i}" class="${on?"on":""} ${a?"asg":""} ${b?"busy":""}" aria-label="${DAYS[d]} ${fmt(m)}${b?", "+esc(b.t):""}" ${b?`title="${esc(b.t)}"`:""}>${b&&b.s===i?`<span class="ev">${esc(b.t)}</span>`:""}</td>`});html+="</tr>"});
+  $("paintGrid").innerHTML=html;
+  const c=calsOn(ME);$("calNote").innerHTML=c.length?`Showing your own calendar (${c.map(x=>esc(x.label)).join(", ")}) so you can see what you already have. Change it in My settings.`:`Tip: add your own calendar in My settings to see what you already have while painting.`}
 function checklistHTML(w,editable){const c=S.checks[w.id]||{};
   return S.tmpl.map((t,k)=>`<label class="inline"><input type="checkbox" data-w="${w.id}" data-t="${esc(t)}" ${c[t]?"checked":""} ${editable?"":"disabled"}> ${esc(t)}</label>`).join("")}
 function doneCount(w){const c=S.checks[w.id]||{};return S.tmpl.filter(t=>c[t]).length}
@@ -417,7 +446,7 @@ function saveWatch(){const {d,s,e}=sel;const picked=[...$("dlgBody").querySelect
   before.forEach(p=>{if(!picked.includes(p))cutPerson(p,d,s,e)});
   picked.forEach(p=>{const isNew=!before.has(p);cutPerson(p,d,s,e);S.asg.push({id:uid(),who:p,d,s,e});if(isNew)S.month[p]=(S.month[p]||0)+1});
   S.asg.sort((a,b)=>a.d-b.d||a.s-b.s||a.who.localeCompare(b.who));sel=null;$("modal").hidden=true;render();
-  toast(picked.length?`Watch set: ${picked.join(", ")} (demo)`:"Watch cleared")}
+  toast(picked.length?`Watch set: ${picked.join(", ")}${S.settings.invites?". Invitations sent":""} (demo)`:"Watch cleared")}
 
 /* ---------- maintenance log (watch checks workers in and out) ---------- */
 const reqLabel=id=>{const r=S.reqs.find(x=>x.id===id);return r?`${r.loc}: ${r.issue}`:""};
@@ -506,8 +535,97 @@ $("s-reports").addEventListener("click",e=>{const k=e.target.dataset.csv,c=e.tar
     try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv(rows)],{type:"text/csv"}));a.download=name;document.body.appendChild(a);a.click();a.remove();toast("Downloaded "+name)}catch(err){copy(csv(rows),"Copied as CSV")}}
   if(c)copy(csv(dataset("man")).replace(/","/g,"\t").replace(/^"|"$/gm,""),"Copied. Paste into Excel or Sheets.")});
 
+/* ---------- shared calendar links ---------- */
+const subLink=()=>`https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(S.settings.calId)}`;
+const icsLink=()=>`https://calendar.google.com/calendar/ical/${encodeURIComponent(S.settings.calId)}/private-XXXX/basic.ics`;
+const copyBox=(id,v)=>`<div class="copybox"><input id="${id}" value="${esc(v)}" readonly><button class="btn small" data-cpv="${id}">Copy</button></div>`;
+document.addEventListener("click",e=>{const id=e.target.dataset&&e.target.dataset.cpv;if(id)copy($(id).value,"Link copied")});
+
+/* ---------- sailor: my settings ---------- */
+function drawMine(){const me=S.staff.find(s=>s.n===ME)||{email:""},cals=S.myCals[ME]||[];
+  $("s-mine").innerHTML=`<div class="panel"><h2>My calendars</h2>
+    <div class="sub" style="margin-top:-8px">Add your own calendar so its events show as striped blocks while you paint your time. Only you see the titles. Senior Chief sees only the time you paint.</div>
+    <ul class="list">${cals.length?cals.map((c,k)=>`<li><label class="inline"><input type="checkbox" data-mcal="${k}" ${c.on?"checked":""}> <span class="item"><b>${esc(c.label)}</b><span class="mono">${esc(c.url)}</span></span></label><button class="btn small" data-mdel="${k}">Remove</button></li>`).join(""):"<li class='empty'>No calendars added.</li>"}</ul>
+    <div class="form"><label>Name<input id="mcLabel" placeholder="e.g. iPhone calendar"></label><label>Calendar address<input id="mcUrl" placeholder="Google address or .ics link"></label></div>
+    <button class="btn primary" id="mcAdd">Add calendar</button>
+    <div class="why"><b>Google:</b> Settings, pick the calendar, copy "Secret address in iCal format." <b>iPhone (iCloud):</b> Calendar app, tap (i) next to the calendar, turn on Public Calendar, Share Link. <b>Outlook:</b> Settings, Shared calendars, Publish, copy the ICS link.</div></div>
+  <div class="stack"><div class="panel"><h2>Subscribe to the main calendar</h2>
+    <div class="sub" style="margin-top:-8px">${esc(S.settings.calName)}. Shows who is in the building and the watch bill on your phone.</div>
+    <label>Google Calendar${copyBox("subG",subLink())}</label><label>iPhone or Outlook (subscribe by URL)${copyBox("subI",icsLink())}</label>
+    <div class="why">Your own watches also arrive as calendar invitations${S.settings.invites?"":" (turned off by admin)"}.</div></div>
+  <div class="panel"><h2>My contact</h2><label>Email for invitations and requests<input id="myEmail" value="${esc(me.email)}"></label><button class="btn small" id="myEmailSave" style="align-self:flex-start">Save</button></div></div>`}
+$("s-mine").addEventListener("click",e=>{const t=e.target;
+  if(t.id==="mcAdd"){const url=$("mcUrl").value.trim();if(!url){$("mcUrl").focus();toast("Paste the calendar address");return}
+    (S.myCals[ME]=S.myCals[ME]||[]).push({label:$("mcLabel").value.trim()||"My calendar",url,on:true});render();toast("Calendar added (demo: sample events only)")}
+  if(t.dataset.mdel!=null){S.myCals[ME].splice(+t.dataset.mdel,1);render()}
+  if(t.id==="myEmailSave"){const me=S.staff.find(s=>s.n===ME);if(me){me.email=$("myEmail").value.trim();save();toast("Email saved")}}});
+$("s-mine").addEventListener("change",e=>{const k=e.target.dataset.mcal;if(k!=null){S.myCals[ME][+k].on=e.target.checked;save();toast(e.target.checked?"Calendar shown":"Calendar hidden")}});
+
+/* ---------- chief: admin ---------- */
+const TEMPLATES={
+  avail:{s:"Building Watch: enter your time for next week",b:"Shipmates,\n\nPlease paint the times you'll be in the building next week by Friday COB.\n\nOpen Building Watch, go to My week, and drag over your hours.\n\nV/r,\n{from}"},
+  watch:{s:"Watch bill posted",b:"Shipmates,\n\nNext week's building watch bill is posted. Check your calendar for invitations and accept them.\n\nV/r,\n{from}"},
+  join:{s:"Join Building Watch",b:"Shipmate,\n\nYou've been added to Building Watch. Please subscribe to the main calendar and add your own calendar under My settings.\n\nV/r,\n{from}"},
+  custom:{s:"",b:""}};
+let mailTo=new Set();
+function opt(list,v){return list.map(p=>`<option ${p===v?"selected":""}>${esc(p)}</option>`).join("")}
+function drawAdmin(){const st=S.settings,names=S.staff.map(s=>s.n),a=st.acting;
+  $("s-admin").innerHTML=`<div class="cols2">
+  <div class="panel"><h2>Who's in charge</h2>
+    <label>Building manager<select id="adMgr">${opt(names,st.manager)}</select></label>
+    <div class="why">When the manager is away, name an acting manager (CIC). They get full admin rights for those dates and are shown as in charge.</div>
+    <div class="form"><label class="full">Acting manager<select id="adActWho"><option value="">None</option>${opt(names,a.who)}</select></label>
+      <label>From<input type="date" id="adActFrom" value="${a.from}"></label><label>Through<input type="date" id="adActTo" value="${a.to}"></label></div>
+    <div class="row" style="justify-content:flex-start"><button class="btn primary" id="adActSave">Save</button>${a.who?`<button class="btn" id="adActClear">End acting</button>`:""}</div>
+    <div class="sub">In charge today: <b>${esc(inCharge())}</b></div></div>
+  <div class="panel"><h2>Main calendar</h2>
+    <label>Calendar name<input id="adCalName" value="${esc(st.calName)}"></label>
+    <label>Google Calendar ID<input id="adCalId" value="${esc(st.calId)}"></label>
+    <div class="why">Make a new calendar in the shared command Google account, then copy its ID from Settings, Integrate calendar. Changing it here points everyone's links and invites to the new calendar.</div>
+    <label class="inline"><input type="checkbox" id="adInv" ${st.invites?"checked":""}> Send watch assignments as private calendar invitations</label>
+    <label>Invitation reminder<select id="adRem">${[["0","None"],["15","15 minutes before"],["30","30 minutes before"],["60","1 hour before"],["1440","1 day before"]].map(([v,l])=>`<option value="${v}" ${v===st.remind?"selected":""}>${l}</option>`).join("")}</select></label>
+    <button class="btn primary" id="adCalSave" style="align-self:flex-start">Save calendar settings</button>
+    <label>Subscribe link for the shop${copyBox("adSub",subLink())}</label></div></div>
+  <div class="panel"><div class="row"><h2>People and roles</h2><span class="why">Admins can assign watches, edit duties and change settings.</span></div>
+    <div class="scroll"><table class="tbl"><tr><th>Name</th><th>Email</th><th>Role</th><th>Stands watch</th><th>Own calendar</th><th></th></tr>
+    ${S.staff.map((s,k)=>`<tr><td><b>${esc(s.n)}</b>${s.n===st.manager?' <span class="chip gold">Manager</span>':""}${s.n===a.who?' <span class="chip">Acting</span>':""}</td>
+      <td><input data-pe="${k}" value="${esc(s.email)}" style="min-width:200px"></td>
+      <td><select data-pr="${k}">${opt(["Admin","Member"],s.role)}</select></td>
+      <td><input type="checkbox" data-pw="${k}" ${s.watch?"checked":""}></td>
+      <td class="why">${calsOn(s.n).length?"Connected":"Not added"}</td>
+      <td>${s.n===st.manager?"":`<button class="btn small" data-px="${k}">Remove</button>`}</td></tr>`).join("")}</table></div>
+    <div class="form addrow"><label>Name<input id="npName" placeholder="e.g. MU2 Garcia"></label><label>Email<input id="npEmail" placeholder="name@example.mil"></label>
+      <label>Role<select id="npRole"><option>Member</option><option>Admin</option></select></label><button class="btn primary" id="npAdd">Add</button></div></div>
+  <div class="panel"><h2>Email the shop</h2>
+    <div class="pick" id="mailPick"><button class="pk" data-mt="*" aria-pressed="${mailTo.size===S.staff.length}">Everyone</button>${S.staff.map(s=>`<button class="pk" data-mt="${esc(s.n)}" aria-pressed="${mailTo.has(s.n)}">${esc(s.n)}</button>`).join("")}</div>
+    <div class="form"><label>Template<select id="mlTpl"><option value="avail">Enter your time for next week</option><option value="watch">Watch bill posted</option><option value="join">Join Building Watch</option><option value="custom">Blank</option></select></label>
+      <label>From<input value="${esc(inCharge())} (shared account)" readonly></label>
+      <label class="full">Subject<input id="mlSubj"></label><label class="full">Message<textarea id="mlBody" style="min-height:150px"></textarea></label></div>
+    <div class="row"><span class="why" id="mlCount"></span><div class="row" style="gap:8px"><button class="btn" id="mlCopy">Copy addresses</button><button class="btn primary" id="mlSend">Send</button></div></div>
+    ${st.mailLog.length?`<div><h3 style="margin-bottom:6px">Sent</h3><ul class="list">${st.mailLog.slice(-5).reverse().map(m=>`<li><span>${esc(m.s)}</span><span class="mono">${m.n} people · ${m.t}</span></li>`).join("")}</ul></div>`:""}</div>`;
+  fillTpl();mlCount()}
+function fillTpl(){const t=TEMPLATES[$("mlTpl").value];$("mlSubj").value=t.s;$("mlBody").value=t.b.replace("{from}",inCharge())}
+function mlCount(){$("mlCount").textContent=mailTo.size?`${mailTo.size} recipient${mailTo.size>1?"s":""}`:"Pick recipients above"}
+$("s-admin").addEventListener("change",e=>{const t=e.target,d=t.dataset;
+  if(t.id==="mlTpl")fillTpl();
+  if(d.pe!=null){S.staff[+d.pe].email=t.value.trim();save()}
+  if(d.pr!=null){S.staff[+d.pr].role=t.value;save();toast(`${S.staff[+d.pr].n} is now ${t.value}`)}
+  if(d.pw!=null){S.staff[+d.pw].watch=t.checked;render()}});
+$("s-admin").addEventListener("click",e=>{const t=e.target,d=t.dataset,st=S.settings;
+  if(t.id==="adActSave"){st.manager=$("adMgr").value;st.acting={who:$("adActWho").value,from:$("adActFrom").value,to:$("adActTo").value};render();toast(st.acting.who?`${st.acting.who} is acting manager`:"Saved")}
+  if(t.id==="adActClear"){st.acting={who:"",from:"",to:""};render();toast("Acting manager ended")}
+  if(t.id==="adCalSave"){st.calName=$("adCalName").value.trim()||st.calName;st.calId=$("adCalId").value.trim()||st.calId;st.invites=$("adInv").checked;st.remind=$("adRem").value;render();toast("Calendar settings saved")}
+  if(d.px!=null){const n=S.staff[+d.px].n;S.staff.splice(+d.px,1);mailTo.delete(n);render();toast(`${n} removed`)}
+  if(t.id==="npAdd"){const n=$("npName").value.trim();if(!n){$("npName").focus();toast("Enter a name");return}if(S.staff.some(s=>s.n===n)){toast("Already on the list");return}
+    S.staff.push({n,email:$("npEmail").value.trim(),role:$("npRole").value,watch:true});render();toast(`${n} added`)}
+  if(d.mt){if(d.mt==="*"){mailTo=mailTo.size===S.staff.length?new Set():new Set(S.staff.map(s=>s.n))}else mailTo.has(d.mt)?mailTo.delete(d.mt):mailTo.add(d.mt);
+    $("mailPick").querySelectorAll(".pk").forEach(b=>b.setAttribute("aria-pressed",b.dataset.mt==="*"?mailTo.size===S.staff.length:mailTo.has(b.dataset.mt)));mlCount()}
+  if(t.id==="mlCopy"){if(!mailTo.size){toast("Pick recipients first");return}copy(S.staff.filter(s=>mailTo.has(s.n)).map(s=>s.email).join("; "),"Addresses copied")}
+  if(t.id==="mlSend"){if(!mailTo.size){toast("Pick recipients first");return}const s=$("mlSubj").value.trim()||"(no subject)";
+    st.mailLog.push({s,n:mailTo.size,t:DATES[TODAY].slice(5).replace("-","/")});const n=mailTo.size;mailTo=new Set();render();toast(`Sent to ${n} (demo, no email went out)`)}});
+
 /* ---------- start ---------- */
-$("resetAll").onclick=()=>{S=sample();chosen.clear();render();toast("Sample data restored")};
+$("resetAll").onclick=()=>{S=sample();chosen.clear();mailTo=new Set();render();toast("Sample data restored")};
 setRole(location.hash==="#chief"?"chief":"sailor");
 </script>
 
