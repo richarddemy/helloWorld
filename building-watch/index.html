@@ -28,6 +28,11 @@
   --h0:#1a2531; --h1:#1d3550; --h2:#24507d; --h3:#3a76b4; --h4:#5b9be0;
   --warn:#ef7a63; --ok:#5cc08a; color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
+#heatGrid{touch-action:none;user-select:none;-webkit-user-select:none}
+.scrim{position:fixed;inset:0;background:rgba(10,18,28,.5);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding:16px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+@media (min-width:600px){.scrim{align-items:center}}
+.dlg{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;width:100%;max-width:420px;display:flex;flex-direction:column;gap:12px;max-height:85vh;overflow:auto}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
 .wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
@@ -137,17 +142,12 @@ ul.list li{display:flex;justify-content:space-between;gap:8px;border-bottom:1px 
         </div>
       </div>
       <div class="scroll"><table class="grid" id="heatGrid"></table></div>
-      <div id="slotInfo" class="empty">Tap any cell to see who is in at that time.</div>
+      <div id="slotInfo" class="empty">Drag over a block of time to assign the watch.</div>
     </div>
 
     <div class="panel">
       <h2>Assign the watch</h2>
-      <div class="form">
-        <label class="full">Day<select id="fDay"></select></label>
-        <label>Start<select id="fStart"></select></label>
-        <label>End<select id="fEnd"></select></label>
-      </div>
-      <ol class="cands" id="cands"></ol>
+      <p class="sub" style="margin:0">Drag down a day on the chart to highlight the watch window. A box opens with everyone who is in the building then, best fit first. Tap a name to assign.</p>
       <div>
         <h2 style="font-size:1rem;margin-bottom:6px">Watch bill this week</h2>
         <ul class="list" id="allAsg"></ul>
@@ -158,6 +158,11 @@ ul.list li{display:flex;justify-content:space-between;gap:8px;border-bottom:1px 
   <p class="note">Prototype only. Names and schedules are sample data, and nothing is sent to Google yet. In the live version, Save writes to the shared "In the Building" calendar and assigning the watch sends that sailor a private calendar invite.</p>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div class="scrim" id="modal" hidden><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT">
+  <h2 id="dlgT"></h2><div class="sub" id="dlgSub"></div>
+  <ol class="cands" id="cands"></ol>
+  <div class="row"><button class="btn small" id="dlgClear" hidden>Remove watch here</button><button class="btn" id="dlgCancel">Cancel</button></div>
+</div></div>
 
 <script>
 const DAYS=["Mon 11/2","Tue 11/3","Wed 11/4","Thu 11/5","Fri 11/6"];
@@ -232,23 +237,39 @@ function whoIn(d,i){return people.filter(p=>avail[p.n].has(d+"-"+i)).map(p=>p.n)
 function drawHeat(){let html=head();
   SLOTS.forEach((m,i)=>{html+="<tr><th class='t'>"+(m%60?"":fmt(m))+"</th>";
     DAYS.forEach((_,d)=>{const c=whoIn(d,i).length;const cls=c===0?"gap":"l"+Math.min(c,4);
-      const s=sel&&sel[0]===d&&sel[1]===i?" sel":"";
+      const s=sel&&sel.d===d&&i>=sel.s&&i<sel.e?" sel":"";
       const w=watchAt(d,i)?" w":"";
       html+=`<td class="${cls}${s}${w}" data-d="${d}" data-i="${i}" tabindex="0" aria-label="${DAYS[d]} ${fmt(m)}, ${c} in building">${c||"0"}</td>`});
     html+="</tr>"});
   $("heatGrid").innerHTML=html}
-$("heatGrid").addEventListener("click",e=>{const td=e.target.closest("td");if(!td)return;pick(+td.dataset.d,+td.dataset.i)});
-$("heatGrid").addEventListener("keydown",e=>{if(e.key==="Enter"){const td=e.target.closest("td");if(td)pick(+td.dataset.d,+td.dataset.i)}});
-function pick(d,i){sel=[d,i];drawHeat();const w=whoIn(d,i);
-  $("slotInfo").innerHTML=`<b>${DAYS[d]} ${fmt(SLOTS[i])}</b>: `+(w.length?w.join(", "):"<span style='color:var(--warn)'>nobody in the building</span>")+"<br>Watch: "+(watchAt(d,i)?"<b>"+watchAt(d,i)+"</b>":"<span style='color:var(--warn)'>not assigned</span>");
-  $("fDay").value=d;$("fStart").value=i;$("fEnd").value=Math.min(i+2,SLOTS.length);suggest()}
+let drag=null;const hg=$("heatGrid");
+function hcell(e){const el=document.elementFromPoint(e.clientX,e.clientY);return el&&el.closest?el.closest("#heatGrid td"):null}
+hg.addEventListener("pointerdown",e=>{const td=hcell(e);if(!td)return;e.preventDefault();hg.setPointerCapture(e.pointerId);
+  const d=+td.dataset.d,i=+td.dataset.i;drag={d,a:i};sel={d,s:i,e:i+1};drawHeat()});
+hg.addEventListener("pointermove",e=>{if(!drag)return;const td=hcell(e);if(!td)return;const i=+td.dataset.i;
+  const s=Math.min(drag.a,i),en=Math.max(drag.a,i)+1;if(s!==sel.s||en!==sel.e){sel={d:drag.d,s,e:en};drawHeat()}});
+const hend=()=>{if(!drag)return;drag=null;openDlg()};
+hg.addEventListener("pointerup",hend);hg.addEventListener("pointercancel",hend);
+hg.addEventListener("keydown",e=>{if(e.key==="Enter"){const td=e.target.closest("td");if(td){const i=+td.dataset.i;sel={d:+td.dataset.d,s:i,e:i+1};drawHeat();openDlg()}}});
+function openDlg(){const {d,s,e}=sel;pick(d,s);
+  $("dlgT").textContent=`Watch: ${DAYS[d]}, ${fmt(SLOTS[s])}-${fmt(SLOTS[e-1]+30)}`;
+  const cur=[...new Set(asg.filter(x=>x.d===d&&x.s<e&&x.e>s).map(x=>x.who))];
+  $("dlgSub").textContent=cur.length?"Currently on watch: "+cur.join(", "):"No watch assigned in this window.";
+  $("dlgClear").hidden=!cur.length;suggest();$("modal").hidden=false;$("dlgCancel").focus()}
+function closeDlg(){$("modal").hidden=true;sel=null;drawHeat()}
+$("dlgCancel").onclick=closeDlg;
+$("modal").addEventListener("click",e=>{if(e.target.id==="modal")closeDlg()});
+$("dlgClear").onclick=()=>{const {d,s,e}=sel;asg=asg.filter(x=>!(x.d===d&&x.s<e&&x.e>s));closeDlg();drawAll();toast("Watch removed")};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("modal").hidden)closeDlg()});
+function pick(d,i){const w=whoIn(d,i);
+  $("slotInfo").innerHTML=`<b>${DAYS[d]} ${fmt(SLOTS[i])}</b>: `+(w.length?w.join(", "):"<span style='color:var(--warn)'>nobody in the building</span>")+"<br>Watch: "+(watchAt(d,i)?"<b>"+watchAt(d,i)+"</b>":"<span style='color:var(--warn)'>not assigned</span>");}
 
 /* ---------- Suggestion algorithm ---------- */
 function fillSelects(){$("fDay").innerHTML=DAYS.map((d,i)=>`<option value="${i}">${d}</option>`).join("");
   $("fStart").innerHTML=SLOTS.map((m,i)=>`<option value="${i}">${fmt(m)}</option>`).join("");
   $("fEnd").innerHTML=SLOTS.map((m,i)=>`<option value="${i+1}">${fmt(m+30)}</option>`).join("");
   $("fDay").value=2;$("fStart").value=0;$("fEnd").value=8}
-function suggest(){const d=+$("fDay").value,s=+$("fStart").value,e=Math.max(+$("fEnd").value,s+1);
+function suggest(){if(!sel)return;const d=sel.d,s=sel.s,e=sel.e;
   const scored=people.map(p=>{let cover=0;for(let i=s;i<e;i++)if(avail[p.n].has(d+"-"+i))cover++;
     const full=cover===e-s,busy=asg.some(x=>x.who===p.n&&x.d===d&&x.s<e&&x.e>s);
     const score=(full?100:cover/(e-s)*40)-(monthCount[p.n]||0)*6-(busy?80:0);
@@ -259,11 +280,11 @@ function suggest(){const d=+$("fDay").value,s=+$("fStart").value,e=Math.max(+$("
     return `<li class="cand ${k===0?"best":""}"><div><b>${x.p.n}</b>${k===0?' <span class="chip">Best fit</span>':""}${x.busy?' <span class="chip warn">Already on watch</span>':""}<div class="why">${why.join(" · ")}</div></div>
       <button class="btn small ${k===0?"primary":""}" data-who="${x.p.n}">Assign</button></li>`}).join("")}
 $("cands").addEventListener("click",e=>{const b=e.target.closest("button[data-who]");if(!b)return;
-  const d=+$("fDay").value,s=+$("fStart").value,en=Math.max(+$("fEnd").value,s+1);
+  const d=sel.d,s=sel.s,en=sel.e;closeDlg();
   asg=asg.filter(x=>!(x.d===d&&x.s<en&&x.e>s));
   asg.push({who:b.dataset.who,d,s,e:en});asg.sort((a,b)=>a.d-b.d||a.s-b.s);monthCount[b.dataset.who]=(monthCount[b.dataset.who]||0)+1;
-  drawAll();toast(`Invite sent to ${b.dataset.who} (demo)`)});
-["fDay","fStart","fEnd"].forEach(id=>$(id).addEventListener("change",suggest));
+  drawAll();toast(`Watch assigned to ${b.dataset.who} (demo)`)});
+
 function drawAll(){drawPaint();drawHeat();suggest();
   $("allAsg").innerHTML=asg.map(x=>`<li><span><b>${x.who}</b></span><span class="mono">${DAYS[x.d].slice(0,3)} ${span(x)}</span></li>`).join("")}
 
@@ -271,7 +292,7 @@ function drawAll(){drawPaint();drawHeat();suggest();
 function view(v){$("sailor").hidden=v!=="sailor";$("chief").hidden=v!=="chief";
   $("vSailor").setAttribute("aria-pressed",v==="sailor");$("vChief").setAttribute("aria-pressed",v==="chief");drawAll()}
 $("vSailor").onclick=()=>view("sailor");$("vChief").onclick=()=>view("chief");
-fillSelects();view(location.hash==="#chief"?"chief":"sailor");
+view(location.hash==="#chief"?"chief":"sailor");
 </script>
 
 </html>
