@@ -27,6 +27,35 @@ button,a{cursor:pointer}a{color:inherit;text-decoration:none}button:focus-visibl
 .formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}.field{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700}.field.wide{grid-column:1/-1}input,select,textarea{width:100%;border:1px solid #cfd9e3;border-radius:8px;background:#fafcfe;padding:12px;color:#172d43}textarea{min-height:85px;resize:vertical}.buttonrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .comp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.comp button{border:2px solid #d6e0e8;background:#f7fafc;border-radius:11px;padding:17px 7px;font-weight:800}.comp button.active{border-color:#bd8b34;background:#fff4df}.success{background:#e6f6eb;border:1px solid #b2dac1;border-radius:10px;padding:15px;color:#1d6d47}.demofoot{color:#6f8090;font-size:12px;text-align:center;margin:30px 0}.visiting{max-width:600px;margin:25px auto}.visiting h1{margin:0 0 5px;font-size:30px}.step{color:#7c612d;font-size:12px;text-transform:uppercase;letter-spacing:.15em;font-weight:800}.subnav{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.subnav a{font-size:13px;font-weight:700;color:#1e679c}
 @media(max-width:810px){.cards{grid-template-columns:1fr}.shell{grid-template-columns:1fr}.sidebar{position:static;display:flex;gap:3px;flex-wrap:wrap}.sidebar .sidecap{width:100%}.sidebar .navbtn{width:auto;padding:8px 10px}.hero{padding:29px 22px}.metrics{grid-template-columns:repeat(3,1fr)}}@media(max-width:520px){.wrap{padding:16px 12px 38px}.formgrid{grid-template-columns:1fr}.field.wide{grid-column:1}.metrics{grid-template-columns:1fr 1fr}.metric strong{font-size:26px}.hero h1{font-size:36px}.comp{gap:5px}.comp button{padding:16px 3px;font-size:13px}}
+
+/* Hands-on availability calendar and immediately visible building assignments */
+.quicklinks{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0}
+.quicklinks button{border:1px solid #bdd0de;background:#f1f7fc;color:#204b71;border-radius:9px;padding:12px 14px;font-weight:800}
+.paintgrid{width:100%;border-spacing:4px;table-layout:fixed;touch-action:none;-webkit-user-select:none;user-select:none}
+.paintgrid th{font-size:11px;color:var(--muted);font-weight:750;padding:3px;white-space:nowrap}
+.paintgrid th:first-child{width:57px}
+.paintgrid td{background:#e7edf3;border:1px solid #d7e2ea;border-radius:5px;height:31px;cursor:crosshair;touch-action:none}
+.paintgrid td.marked{background:#2b70aa;border-color:#1b588a}
+.paintgrid td:focus-visible{outline:3px solid #c4943d;outline-offset:-2px}
+.availtop{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.availtop h3{margin:0 0 4px}
+.availtop .week{font-size:14px;font-weight:800}
+.availdays{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:12px}
+.availday{border:1px solid var(--line);background:#f7fafc;border-radius:9px;padding:10px;min-width:0}
+.availday b{font-size:12px}.availday span{display:block;color:var(--muted);font-size:12px;margin-top:7px;line-height:1.55}
+.availlegend{display:flex;gap:12px;align-items:center;font-size:13px;color:var(--muted);margin:10px 0}
+.availlegend i{width:15px;height:15px;display:inline-block;background:#2b70aa;border-radius:4px;vertical-align:middle}
+.availbar{border:1px solid var(--line);background:white;border-radius:11px;padding:14px;margin-bottom:16px}
+.availbar strong{font-size:15px}
+.statusline{font-weight:750;font-size:13px;color:#745621}
+.worklist{display:grid;gap:9px;margin:10px 0}
+.workitem{display:flex;gap:11px;align-items:flex-start;padding:12px;background:#f7fafc;border:1px solid var(--line);border-radius:9px}
+.workitem input{width:20px;height:20px;accent-color:#287a55;flex-shrink:0;margin:1px}
+.workitem label{flex:1;min-width:0;cursor:pointer}
+.workitem b{display:block;font-size:14px}.workitem small{display:block;color:var(--muted);font-size:12px;margin-top:5px}
+.workitem.done{opacity:.7}.workitem.done b{text-decoration:line-through}
+.miniheading{font-weight:800;font-size:15px;margin:14px 0 6px}
+@media(max-width:720px){.availdays{grid-template-columns:repeat(2,minmax(0,1fr))}.paintgrid{border-spacing:2px}.paintgrid td{height:34px}.paintgrid th:first-child{width:50px}.quicklinks button{flex:1}.availtop{align-items:stretch}}
 </style></head><body>
 <div class="wrap">
 <header class="bar"><a class="brand" href="#home">◈ BUILDING <i>WATCH</i></a><span class="pill">V3 INTERACTIVE PREVIEW · FICTIONAL DATA</span><a class="toplink" href="#signin">Staff sign-in demo →</a></header>
@@ -42,26 +71,161 @@ var examplePeople=['MUCS Morgan','MUC Alvarez','MU1 Taylor','MU2 Brooks','MU1 Ch
 function initial(){return {contractors:[{name:'J. Ramos',company:'Public Works HVAC',task:'Replace room 210 thermostat',email:'contractor@example.com',in:'09:15',out:'',status:'In building'},{name:'M. Dunn',company:'Bright Electric',task:'Hallway lighting repair',email:'contractor2@example.com',in:'08:40',out:'11:20',status:'Partly',note:'Two fixtures need replacement parts'}]};}
 var data=initial();try{data=JSON.parse(localStorage.getItem(KEY)||'null')||initial();}catch(e){data=initial();}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}}
+
+if(!data.workTasks) data.workTasks=[
+ {id:'wt-1',title:'Inspect exterior doors and access points',kind:'Watch duty',owner:'Watch stander',due:'Today',done:false},
+ {id:'wt-2',title:'Check all rehearsal halls and report discrepancies',kind:'Watch duty',owner:'Watch stander',due:'Today',done:true},
+ {id:'wt-3',title:'Verify Room 210 thermostat repair before closing ticket',kind:'Maintenance follow-up',owner:'Facilities watch',due:'Today',done:false},
+ {id:'wt-4',title:'Follow up on hallway light fixture replacement parts',kind:'Work order WO-48827',owner:'Facilities watch',due:'This week',done:false},
+ {id:'wt-5',title:'Review contractor sign-outs and incomplete jobs',kind:'Maintenance log',owner:'Duty personnel',due:'Today',done:false}
+];
+if(!data.availability) data.availability={};
+function mondayKey(offset){const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7)+(offset||0)*7);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+if(!data.availability[mondayKey(0)]){
+ var seeded={};
+ [[0,1,9],[1,2,12],[3,4,16],[4,0,6]].forEach(function(a){for(var k=a[1];k<a[2];k++)seeded[a[0]+'-'+k]=true;});
+ data.availability[mondayKey(0)]=seeded;
+}
+var availabilityWeek=0,draftWeek='',draftAvailability={},availabilityDirty=false;
+function refreshDraft(){
+ var k=mondayKey(availabilityWeek);
+ if(draftWeek!==k){draftWeek=k;draftAvailability=Object.assign({},data.availability[k]||{});availabilityDirty=false;}
+}
+const dayNames=['Monday','Tuesday','Wednesday','Thursday','Friday'];
+function slotText(i){const m=8*60+i*30,hr=Math.floor(m/60),mm=m%60,hh=hr%12||12;return hh+':'+String(mm).padStart(2,'0')+(hr<12?' AM':' PM');}
+function taskItems(limit){
+ const list=limit?data.workTasks.slice(0,limit):data.workTasks;
+ return list.map(function(t){return '<div class="workitem '+(t.done?'done':'')+'"><input aria-label="Complete '+clean(t.title)+'" type="checkbox" data-task-check="'+clean(t.id)+'" '+(t.done?'checked':'')+'><label><b>'+clean(t.title)+'</b><small>'+clean(t.kind)+' · '+clean(t.owner)+' · '+clean(t.due)+'</small></label></div>';}).join('');
+}
+
 function el(){return document.getElementById('screen');}
 function clean(t){return String(t==null?'':t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function heading(t,sub){return '<div class="titlebar"><div><div class="eyebrow">Building Watch / '+clean(person==='admin'?'Administrator':'Watch stander')+'</div><h2>'+clean(t)+'</h2><div class="subtitle">'+clean(sub)+'</div></div><button class="btn small" id="signout">Switch role</button></div>';}
-function home(){return '<section class="hero"><div class="eyebrow">Facilities operations · Leadership review</div><h1>One view of the building.<br>One record of the work.</h1><p>Explore a working demonstration of availability, watch assignments, maintenance reports, contractor check-in and completion tracking. All records shown are fictional.</p><div class="actions"><a href="#signin" class="btn primary">Staff sign-in demo →</a><a href="#visitor" class="btn outline">Contractor QR check-in →</a></div></section><div class="cards"><a href="#signin" class="card"><div class="ico">▦</div><h3>Staff operations</h3><p>Watch bill, availability, checklists and the maintenance log.</p><span class="go">Open staff demo →</span></a><a href="#visitor" class="card"><div class="ico">▣</div><h3>Civilian contractors</h3><p>Arrival check-in, contact information, departure and completion reports.</p><span class="go">Try check-in →</span></a><a href="#admin" class="card"><div class="ico">▤</div><h3>Leadership reporting</h3><p>Follow-ups, work-order status and downloadable CSV files.</p><span class="go">Review dashboard →</span></a></div><div class="notice"><b>Demo, not a live building log.</b> No real visitor data should be entered. The production system uses Hostinger PHP/MariaDB with authorized Google authentication. This public static demonstration does not contact either system.</div>';}
+function home(){return '<section class="hero"><div class="eyebrow">Facilities operations · Leadership review</div><h1>One view of the building.<br>One record of the work.</h1><p>Explore a working demonstration of availability, watch assignments, maintenance reports, contractor check-in and completion tracking. All records shown are fictional.</p><div class="actions"><a href="#signin" class="btn primary">Staff sign-in demo →</a><a href="#visitor" class="btn outline">Contractor QR check-in →</a></div></section><div class="cards"><a href="#signin" class="card"><div class="ico">▦</div><h3>Swipe availability</h3><p>Mark your free time directly in the half-hour calendar, save it and review a day-by-day availability list.</p><span class="go">Open staff demo →</span></a><a href="#visitor" class="card"><div class="ico">▣</div><h3>Civilian contractors</h3><p>Arrival check-in, contact information, departure and completion reports.</p><span class="go">Try check-in →</span></a><a href="#admin" class="card"><div class="ico">▤</div><h3>Leadership reporting</h3><p>Follow-ups, work-order status and downloadable CSV files.</p><span class="go">Review dashboard →</span></a></div><div class="notice"><b>Demo, not a live building log.</b> No real visitor data should be entered. The production system uses Hostinger PHP/MariaDB with authorized Google authentication. This public static demonstration does not contact either system.</div>';}
 function signin(){return '<div class="center"><div class="card login"><div class="eyebrow">Building Watch · Staff demo sign-in</div><h1>Choose a sample role</h1><p class="subtitle">The live application uses approved Google accounts. This preview has no real authentication and never asks for credentials.</p><button class="btn choice" data-role="admin"><span><strong>Senior Chief / Administrator</strong><small>Watch bill, maintenance, reports, configuration</small></span><b>→</b></button><button class="btn choice" data-role="member"><span><strong>Watch stander / Sailor</strong><small>Availability, assigned watches, service requests</small></span><b>→</b></button><div class="notice">All personnel and companies in this preview are fictional. Sample changes remain in this browser only.</div><div class="subnav"><a href="#home">← Presentation overview</a><a href="#visitor">Contractor sign-in →</a></div></div></div>';}
-function nav(){var tabs=person==='admin'?[['overview','Overview'],['availability','Availability'],['watch','Watch bill'],['maintenance','Maintenance log'],['requests','Service requests'],['reports','Reports']]:[['overview','Overview'],['availability','My week'],['maintenance','Maintenance log'],['requests','Service requests']];return '<aside class="sidebar"><div class="sidecap">'+clean(person==='admin'?'Admin view':'Member view')+'</div>'+tabs.map(function(a){return '<button class="navbtn '+(page===a[0]?'active':'')+'" data-page="'+a[0]+'">'+a[1]+'</button>';}).join('')+'<div class="sidecap">Visitor portal</div><button class="navbtn" id="gotoVisitor">QR check-in demo ↗</button></aside>';}
-function staffOverview(){var active=data.contractors.filter(function(r){return !r.out;}).length;var follow=data.contractors.filter(function(r){return r.status==='Partly'||r.status==='No';}).length;return heading('Building status','Weekly staffing and facilities overview')+'<div class="metrics"><div class="metric"><strong>8</strong><span>Personnel on schedule today</span></div><div class="metric"><strong>'+active+'</strong><span>Contractors checked in</span></div><div class="metric"><strong>'+follow+'</strong><span>Maintenance follow-ups</span></div></div><div class="panel"><div class="titlebar"><div><h3>Watch responsibilities</h3><p class="subtitle">Today’s duty assignments</p></div></div><div class="tablewrap"><table><thead><tr><th>Time</th><th>Watch stander</th><th>Checklist</th></tr></thead><tbody><tr><td>0730–1100</td><td>MUC Alvarez</td><td><span class="chip good">4 of 5 done</span></td></tr><tr><td>1100–1400</td><td>MU2 Brooks</td><td><span class="chip warn">2 of 5 done</span></td></tr><tr><td>1400–1600</td><td>MU1 Chen</td><td><span class="chip">Upcoming</span></td></tr></tbody></table></div></div><div class="panel"><div class="titlebar"><h3>Maintenance activity</h3><button class="btn small" data-page="maintenance">Open log →</button></div><p class="subtitle">Track arrivals, departures, work performed and items that remain unresolved.</p></div>';}
-function availability(){var days=['Mon','Tue','Wed','Thu','Fri'];var out='<div class="days"><div class="head">Time</div>'+days.map(function(d){return '<div class="head">'+d+'</div>';}).join('');for(var h=8;h<=16;h+=2){out+='<div class="head">'+(h>12?h-12:h)+':00</div>';for(var j=0;j<5;j++){var c=(h+j)%4===0?'dark':(h+j)%3===0?'med':'';out+='<div class="slot '+c+'" title="Sample availability">'+((h+j)%5===0?'WATCH':'')+'</div>';}}return heading('Building availability','Sample availability calendar; the production app can consider multiple Google Calendars')+'<div class="panel"><h3>Week at a glance</h3><p class="subtitle">Color indicates planned presence; dark cells indicate more coverage.</p><div class="tablewrap">'+out+'</div></div><div class="panel"><p class="subtitle">The production version stores this availability in Hostinger MariaDB and can create calendar events through the Google Calendar integration.</p></div>';}
+function nav(){var tabs=person==='admin'?[['overview','Overview'],['availability','Swipe availability'],['tasks','My assigned work'],['watch','Watch bill'],['maintenance','Maintenance log'],['requests','Service requests'],['reports','Reports']]:[['overview','Overview'],['availability','Swipe availability'],['tasks','My assigned work'],['maintenance','Maintenance log'],['requests','Service requests']];return '<aside class="sidebar"><div class="sidecap">'+clean(person==='admin'?'Admin view':'Member view')+'</div>'+tabs.map(function(a){return '<button class="navbtn '+(page===a[0]?'active':'')+'" data-page="'+a[0]+'">'+a[1]+'</button>';}).join('')+'<div class="sidecap">Visitor portal</div><button class="navbtn" id="gotoVisitor">QR check-in demo ↗</button></aside>';}
+
+function staffOverview(){
+ var active=data.contractors.filter(function(r){return !r.out;}).length;
+ var follow=data.contractors.filter(function(r){return r.status==='Partly'||r.status==='No';}).length;
+ var unfinished=data.workTasks.filter(function(t){return !t.done;}).length;
+ return heading('Building status','Your availability, assigned work and watch responsibilities, all in one place')+
+ '<div class="quicklinks"><button data-open-page="availability">1 · Swipe my availability →</button><button data-open-page="tasks">2 · My assigned work ('+unfinished+') →</button><button data-open-page="maintenance">3 · Maintenance check-in →</button></div>'+
+ '<div class="metrics"><div class="metric"><strong>8</strong><span>Staff scheduled today · sample</span></div><div class="metric"><strong>'+active+'</strong><span>Civilians checked in</span></div><div class="metric"><strong>'+follow+'</strong><span>Maintenance follow-ups</span></div></div>'+
+ '<div class="panel"><div class="titlebar"><div><h3>My assigned work</h3><p class="subtitle">'+unfinished+' tasks still to do. Check them off or review them in the full list.</p></div><button class="btn small" data-open-page="tasks">See all work →</button></div><div class="worklist">'+taskItems(4)+'</div></div>'+
+ '<div class="panel"><div class="titlebar"><div><h3>When are you available?</h3><p class="subtitle">Swipe across half-hour calendar blocks to mark the time you can be in the building, then save.</p></div><button class="btn small navy" data-open-page="availability">Open swipe calendar →</button></div></div>'+
+ '<div class="panel"><div class="titlebar"><div><h3>Watch assignments</h3><p class="subtitle">Today’s example duty assignments</p></div></div><div class="tablewrap"><table><thead><tr><th>Time</th><th>Watch stander</th><th>Checklist</th></tr></thead><tbody><tr><td>0730–1100</td><td>MUC Alvarez</td><td><span class="chip good">4 of 5 done</span></td></tr><tr><td>1100–1400</td><td>MU2 Brooks</td><td><span class="chip warn">2 of 5 done</span></td></tr><tr><td>1400–1600</td><td>MU1 Chen</td><td><span class="chip">Upcoming</span></td></tr></tbody></table></div></div>';
+}
+
+
+function availability(){
+ refreshDraft();
+ let key=draftWeek, rows='<thead><tr><th>Time</th>'+dayNames.map(function(d){return '<th>'+d.slice(0,3)+'</th>';}).join('')+'</tr></thead><tbody>';
+ for(let i=0;i<18;i++){
+  rows+='<tr><th>'+slotText(i).replace(' AM','a').replace(' PM','p')+'</th>';
+  for(let d=0;d<5;d++){
+   const k=d+'-'+i;
+   rows+='<td data-day="'+d+'" data-slot="'+i+'" role="checkbox" tabindex="0" aria-label="'+dayNames[d]+' '+slotText(i)+'" aria-checked="'+(!!draftAvailability[k])+'" class="'+(draftAvailability[k]?'marked':'')+'"></td>';
+  }
+  rows+='</tr>';
+ }
+ rows+='</tbody>';
+ return heading('My availability','Swipe or drag over blocks to mark when you are free to be in the building')+
+ '<div class="panel"><div class="availtop"><div><h3>Week of '+clean(key)+'</h3><div class="subtitle">Blue = available · Gray = unmarked. Swipe again to erase.</div></div><div class="buttonrow"><button class="btn small" id="availPrev">← Previous</button><button class="btn small" id="availNext">Next →</button></div></div>'+
+ '<div class="availbar"><strong>1. Mark your free time → 2. Review the list → 3. Save</strong><p class="subtitle">Touch and swipe on your phone, or click and drag with a mouse. Each block is 30 minutes. Tap a block to toggle it. You can also use Enter or Space on a focused block.</p></div>'+
+ '<div class="tablewrap"><table id="availGrid" class="paintgrid">'+rows+'</table></div>'+
+ '<div class="availlegend"><span><i></i> Available time</span><span id="availFeedback" class="statusline">'+(availabilityDirty?'Unsaved changes':'Saved in this demo browser')+'</span></div>'+
+ '<div class="buttonrow"><button class="btn navy" id="availSave">Save availability</button><button class="btn" id="availCopy">Copy Monday to every day</button><button class="btn" id="availClear">Clear this week</button></div>'+
+ '</div><div class="panel"><div class="titlebar"><div><h3>Listed availability</h3><p class="subtitle">Your available times summarized by day, automatically updated as you swipe.</p></div></div><div id="availList" class="availdays"></div></div>'+
+ '<div class="panel"><div class="titlebar"><h3>What work are we tasked to do?</h3><button class="btn small" data-open-page="tasks">Open assigned work →</button></div><div class="worklist">'+taskItems(3)+'</div></div>';
+}
+function drawAvailSummary(){
+ const el=document.getElementById('availList');if(!el)return;
+ const list=dayNames.map(function(day,d){
+  let spans=[],begin=-1;
+  for(let i=0;i<=18;i++){
+   const on=i<18&&!!draftAvailability[d+'-'+i];
+   if(on&&begin<0)begin=i;
+   if(!on&&begin>=0){spans.push(slotText(begin)+' – '+slotText(i));begin=-1;}
+  }
+  return '<div class="availday"><b>'+day+'</b><span>'+ (spans.length?spans.join('<br>'):'Not marked')+'</span></div>';
+ });
+ el.innerHTML=list.join('');
+ const status=document.getElementById('availFeedback');
+ if(status)status.textContent=availabilityDirty?'Unsaved changes · press Save availability':'Saved in this demo browser';
+}
+function paintAvailCell(cell,mode){
+ if(!cell)return;
+ const key=cell.dataset.day+'-'+cell.dataset.slot;
+ if(mode)draftAvailability[key]=true;else delete draftAvailability[key];
+ cell.classList.toggle('marked',!!mode);
+ cell.setAttribute('aria-checked',String(!!mode));
+ availabilityDirty=true;drawAvailSummary();
+}
+
 function watch(){return heading('Assign the watch','Compare planned occupancy and cover watch periods')+'<div class="panel"><div class="titlebar"><h3>Watch bill this week</h3><span class="chip">Sample schedule</span></div><div class="tablewrap"><table><thead><tr><th>Day</th><th>0730–1100</th><th>1100–1400</th><th>1400–1630</th></tr></thead><tbody><tr><td>Monday</td><td>MUC Alvarez</td><td>MU2 Brooks</td><td>MU1 Chen</td></tr><tr><td>Tuesday</td><td>MU1 Taylor</td><td>MU1 Chen</td><td>MU2 Brooks</td></tr><tr><td>Wednesday</td><td>MU2 Brooks</td><td>MU1 Taylor</td><td>MUC Alvarez</td></tr><tr><td>Thursday</td><td>MU1 Chen</td><td>MUC Alvarez</td><td>MU1 Taylor</td></tr></tbody></table></div></div><div class="panel"><h3>Sample watch duties</h3><p class="subtitle">Walk all decks · Check exterior doors · Inspect rehearsal halls · Check restrooms · File service requests</p></div>';}
 function contractors(){return data.contractors.map(function(r){var tag=r.out?('<span class="chip '+(r.status==='Yes'?'good':'warn')+'">'+clean(r.status==='Yes'?'Fixed':r.status==='Partly'?'Partly fixed':'Not fixed')+'</span>'):'<span class="chip good">Checked in</span>';return '<tr><td><b>'+clean(r.name)+'</b><br><span class="subtitle">'+clean(r.company)+'</span></td><td>'+clean(r.task)+'</td><td>'+clean(r.in)+'</td><td>'+clean(r.out||'—')+'</td><td>'+tag+'</td></tr>';}).join('');}
 function maintenance(){return heading('Maintenance log','Civilian contractor entry and work completion tracking')+'<div class="metrics"><div class="metric"><strong>'+data.contractors.filter(function(r){return !r.out;}).length+'</strong><span>Visitors currently in building</span></div><div class="metric"><strong>'+data.contractors.filter(function(r){return !!r.out;}).length+'</strong><span>Checked out</span></div><div class="metric"><strong>'+data.contractors.filter(function(r){return r.status==='Partly'||r.status==='No';}).length+'</strong><span>Needs follow-up</span></div></div><div class="panel"><div class="titlebar"><h3>Workers and work orders</h3><a href="#visitor" class="btn small">Open contractor check-in ↗</a></div><div class="tablewrap"><table><thead><tr><th>Person / company</th><th>Task</th><th>Arrived</th><th>Left</th><th>Reported outcome</th></tr></thead><tbody>'+contractors()+'</tbody></table></div></div><div class="panel"><h3>Required follow-up</h3><p class="subtitle">Contractor self-reported completion does not automatically close a service request. A watch stander or administrator must verify the work.</p></div>';}
 function requests(){return heading('Service requests','Coordinate work orders and monitor their resolution')+'<div class="panel"><div class="tablewrap"><table><thead><tr><th>Work order</th><th>Location</th><th>Issue</th><th>Status</th></tr></thead><tbody><tr><td>WO-48812</td><td>Room 210</td><td>Thermostat not responding</td><td><span class="chip warn">In progress</span></td></tr><tr><td>WO-48827</td><td>2nd deck hall</td><td>Lighting fixtures need parts</td><td><span class="chip warn">Follow-up</span></td></tr><tr><td>WO-48650</td><td>Loading dock</td><td>Door closer adjustment</td><td><span class="chip good">Verified closed</span></td></tr></tbody></table></div></div>';}
+
+function tasks(){
+ const open=data.workTasks.filter(function(t){return !t.done;}).length;
+ return heading('My assigned work','Watch duties and building maintenance items that need action')+
+ '<div class="metrics"><div class="metric"><strong>'+data.workTasks.length+'</strong><span>Example tasks</span></div><div class="metric"><strong>'+open+'</strong><span>Still to do</span></div><div class="metric"><strong>'+ (data.workTasks.length-open)+'</strong><span>Completed</span></div></div>'+
+ '<div class="panel"><div class="titlebar"><div><h3>Task list</h3><p class="subtitle">Check off completed items. This demo keeps them in your browser, not a Navy system.</p></div></div><div class="worklist">'+taskItems()+'</div></div>'+
+ '<div class="panel"><div class="titlebar"><div><h3>Open service requests</h3><p class="subtitle">Example facility repairs to monitor until the work has been verified.</p></div><button class="btn small" data-open-page="requests">View work orders →</button></div><div class="tablewrap"><table><thead><tr><th>Work order</th><th>Task</th><th>Status</th></tr></thead><tbody><tr><td>WO-48812</td><td>Room 210 thermostat</td><td><span class="chip warn">In progress</span></td></tr><tr><td>WO-48827</td><td>Hallway light fixtures</td><td><span class="chip warn">Needs parts</span></td></tr></tbody></table></div></div>';
+}
+
 function reports(){return heading('Reports and exports','CSV files from the production application are generated from MariaDB records')+'<div class="panel"><h3>Download sample records</h3><p class="subtitle">Export the contractor check-in register. The CSV uses fictional browser-only records in this preview.</p><div class="buttonrow"><button class="btn navy" id="csv">Download visitor CSV ↓</button><button class="btn" id="reset">Reset demo sample records</button></div></div><div class="panel"><h3>Available production exports</h3><p class="subtitle">Manpower · Maintenance log · Service requests · Contractor register, including arrival/departure and reported completion.</p></div>';}
-function staff(){var content={overview:staffOverview,availability:availability,watch:watch,maintenance:maintenance,requests:requests,reports:reports};if(person==='member'&&(page==='watch'||page==='reports'))page='overview';return '<div class="shell">'+nav()+'<div class="content">'+(content[page]||staffOverview)()+'</div></div>';}
+
+function staff(){
+ const content={overview:staffOverview,availability:availability,tasks:tasks,watch:watch,maintenance:maintenance,requests:requests,reports:reports};
+ if(person==='member'&&(page==='watch'||page==='reports'))page='overview';
+ return '<div class="shell">'+nav()+'<div class="content">'+(content[page]||staffOverview)()+'</div></div>';
+}
+
 function active(){return data.contractors.find(function(x){return !x.out&&x.name===data.current;})||null;}
 function visitor(){var r=active();return '<div class="visiting"><div class="eyebrow">Civilian visitor portal · QR code destination</div><h1>Contractor '+(r?'sign-out':'check-in')+'</h1><p class="subtitle">The visitor uses their own phone. No app installation required. In the production version an email sign-out link is sent automatically.</p><div class="subnav"><a href="#home">← Overview</a><a href="#signin">Staff sign-in demo →</a></div>'+(r?'<div class="card" style="margin-top:22px"><div class="success"><b>Checked in: '+clean(r.name)+'</b><br>'+clean(r.company)+' · '+clean(r.task)+'<br><small>Arrival: '+clean(r.in)+'</small></div><p class="subtitle">In production the visitor receives a sign-out email. For this demo, press the button below.</p><button class="btn navy" id="openCheckout">Leave building / Sign out →</button></div>':'<div class="card" style="margin-top:22px"><div class="step">Step 1 · Arrival</div><form id="visitorIn" class="formgrid"><label class="field">Full name<input name="name" value="Alex Example" required maxlength="100"></label><label class="field">Company / shop<input name="company" value="Example HVAC Services" required maxlength="100"></label><label class="field wide">Email address<input name="email" type="email" value="alex@example.com" required></label><label class="field wide">Reason for visit / task<textarea name="task" required>Inspect air conditioning in rehearsal room 210</textarea></label><label class="field">Work order (optional)<input name="workOrder" value="WO-DEMO-123"></label><label class="field">Phone (optional)<input name="phone" placeholder="Optional"></label><p class="subtitle" style="grid-column:1/-1">Demo only: no email is sent and location is not collected. Please use fictional information.</p><button class="btn navy" style="grid-column:1/-1">Check in →</button></form></div>')+'</div>';}
 function checkout(){var r=active();if(!r)return visitor();return '<div class="visiting"><div class="eyebrow">Contractor departure · Step 2</div><h1>Was the work completed?</h1><p class="subtitle">'+clean(r.name)+' · '+clean(r.task)+'</p><div class="card" style="margin-top:17px"><div class="comp"><button type="button" class="'+(completion==='Yes'?'active':'')+'" data-complete="Yes">✓<br>Fixed</button><button type="button" class="'+(completion==='Partly'?'active':'')+'" data-complete="Partly">◐<br>Partly</button><button type="button" class="'+(completion==='No'?'active':'')+'" data-complete="No">✕<br>Not fixed</button></div><form id="visitorOut" class="formgrid"><label class="field wide">What remains to be done?'+(completion==='Yes'?' (optional)':' (required)')+'<textarea name="note" '+(completion==='Yes'?'':'required')+' placeholder="Parts ordered; returning later, etc."></textarea></label><label class="field wide">Other problems noticed (optional)<textarea name="problem" placeholder="New issues discovered"></textarea></label><button class="btn navy" style="grid-column:1/-1">Sign out and report →</button></form></div></div>';}
 function finished(){return '<div class="center"><div class="card"><div class="success"><b>Demo checkout recorded.</b><p>Thank you. In production, the maintenance log is updated, and staff can review whether the work is actually complete.</p></div><div class="buttonrow"><a href="#signin" class="btn navy">View staff dashboard →</a><button id="newVisitor" class="btn">New demo check-in</button></div></div></div>';}
 function render(){var hash=location.hash.replace('#','')||'home';if(hash==='admin'){person='admin';page='reports';hash='staff';}if(hash==='staff'&&!(person==='admin'||person==='member'))hash='signin';el().innerHTML=hash==='home'?home():hash==='signin'?signin():hash==='visitor'?visitor():hash==='checkout'?checkout():hash==='finished'?finished():staff();attach();}
-function attach(){document.querySelectorAll('[data-role]').forEach(function(b){b.onclick=function(){person=b.getAttribute('data-role');page='overview';location.hash='staff';render();};});document.querySelectorAll('[data-page]').forEach(function(b){b.onclick=function(){page=b.getAttribute('data-page');render();};});var s=document.getElementById('signout');if(s)s.onclick=function(){location.hash='signin';};var v=document.getElementById('gotoVisitor');if(v)v.onclick=function(){location.hash='visitor';};var f=document.getElementById('visitorIn');if(f)f.onsubmit=function(e){e.preventDefault();var p=new FormData(f);data.current=String(p.get('name')).trim();if(!data.current||!String(p.get('company')).trim()||!String(p.get('task')).trim())return;data.contractors.push({name:data.current,company:String(p.get('company')),email:String(p.get('email')),task:String(p.get('task')),workOrder:String(p.get('workOrder')||''),in:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),out:'',status:'In building'});save();render();};var o=document.getElementById('openCheckout');if(o)o.onclick=function(){location.hash='checkout';};document.querySelectorAll('[data-complete]').forEach(function(b){b.onclick=function(){completion=b.getAttribute('data-complete');render();};});var x=document.getElementById('visitorOut');if(x)x.onsubmit=function(e){e.preventDefault();var r=active();if(!r)return;var p=new FormData(x);if(completion!=='Yes'&&String(p.get('note')).trim().length<3){alert('Please describe what work remains.');return;}r.out=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});r.status=completion;r.note=String(p.get('note')||'');r.problem=String(p.get('problem')||'');data.current='';save();location.hash='finished';};var csv=document.getElementById('csv');if(csv)csv.onclick=exportCsv;var reset=document.getElementById('reset');if(reset)reset.onclick=function(){data=initial();save();render();};var n=document.getElementById('newVisitor');if(n)n.onclick=function(){location.hash='visitor';};}
+
+function attach(){
+ document.querySelectorAll('[data-role]').forEach(function(b){b.onclick=function(){person=b.getAttribute('data-role');page='overview';location.hash='staff';render();};});
+ document.querySelectorAll('[data-page]').forEach(function(b){b.onclick=function(){page=b.getAttribute('data-page');render();};});
+ document.querySelectorAll('[data-open-page]').forEach(function(b){b.onclick=function(){page=b.dataset.openPage;location.hash='staff';render();};});
+ document.querySelectorAll('[data-task-check]').forEach(function(b){b.onchange=function(){const item=data.workTasks.find(function(t){return t.id===b.dataset.taskCheck;});if(item){item.done=b.checked;save();render();}};});
+ let s=document.getElementById('signout');if(s)s.onclick=function(){location.hash='signin';};
+ let v=document.getElementById('gotoVisitor');if(v)v.onclick=function(){location.hash='visitor';};
+ let grid=document.getElementById('availGrid');
+ if(grid){
+  drawAvailSummary();
+  let painting=null,pointerId=null;
+  function cellAt(e){const hit=document.elementFromPoint(e.clientX,e.clientY);return hit?hit.closest('#availGrid td[data-day]'):null;}
+  grid.addEventListener('pointerdown',function(e){
+   const td=cellAt(e);if(!td)return;
+   e.preventDefault();const k=td.dataset.day+'-'+td.dataset.slot;
+   painting=!draftAvailability[k];pointerId=e.pointerId;
+   grid.setPointerCapture(e.pointerId);paintAvailCell(td,painting);
+  });
+  grid.addEventListener('pointermove',function(e){if(painting===null||e.pointerId!==pointerId)return;const td=cellAt(e);if(td)paintAvailCell(td,painting);});
+  function stop(){painting=null;pointerId=null;}
+  grid.addEventListener('pointerup',stop);grid.addEventListener('pointercancel',stop);grid.addEventListener('lostpointercapture',stop);
+  grid.addEventListener('keydown',function(e){if((e.key===' '||e.key==='Enter')&&e.target.matches('td[data-day]')){e.preventDefault();const td=e.target,k=td.dataset.day+'-'+td.dataset.slot;paintAvailCell(td,!draftAvailability[k]);}});
+ }
+ const aSave=document.getElementById('availSave');if(aSave)aSave.onclick=function(){data.availability[draftWeek]=Object.assign({},draftAvailability);availabilityDirty=false;save();drawAvailSummary();};
+ const clear=document.getElementById('availClear');if(clear)clear.onclick=function(){draftAvailability={};availabilityDirty=true;render();};
+ const copy=document.getElementById('availCopy');if(copy)copy.onclick=function(){for(let d=1;d<5;d++)for(let i=0;i<18;i++){let k='0-'+i,target=d+'-'+i;if(draftAvailability[k])draftAvailability[target]=true;else delete draftAvailability[target];}availabilityDirty=true;render();};
+ for(let pair of [['availPrev',-1],['availNext',1]]){const b=document.getElementById(pair[0]);if(b)b.onclick=function(){if(availabilityDirty&&!confirm('Discard the unsaved availability changes for this week?'))return;availabilityWeek+=pair[1];draftWeek='';refreshDraft();render();};}
+ let f=document.getElementById('visitorIn');if(f)f.onsubmit=function(e){e.preventDefault();const p=new FormData(f);data.current=String(p.get('name')).trim();if(!data.current||!String(p.get('company')).trim()||!String(p.get('task')).trim())return;data.contractors.push({name:data.current,company:String(p.get('company')),email:String(p.get('email')),task:String(p.get('task')),workOrder:String(p.get('workOrder')||''),in:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),out:'',status:'In building'});save();render();};
+ let o=document.getElementById('openCheckout');if(o)o.onclick=function(){location.hash='checkout';};
+ document.querySelectorAll('[data-complete]').forEach(function(b){b.onclick=function(){completion=b.getAttribute('data-complete');render();};});
+ let x=document.getElementById('visitorOut');if(x)x.onsubmit=function(e){e.preventDefault();let r=active();if(!r)return;let p=new FormData(x);if(completion!=='Yes'&&String(p.get('note')).trim().length<3){alert('Please describe what work remains.');return;}r.out=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});r.status=completion;r.note=String(p.get('note')||'');r.problem=String(p.get('problem')||'');data.current='';save();location.hash='finished';};
+ let csv=document.getElementById('csv');if(csv)csv.onclick=exportCsv;
+ let reset=document.getElementById('reset');if(reset)reset.onclick=function(){data=initial();delete data.workTasks;delete data.availability;localStorage.removeItem(KEY);location.reload();};
+ let n=document.getElementById('newVisitor');if(n)n.onclick=function(){location.hash='visitor';};
+}
+
 function exportCsv(){var rows=[['Name','Company','Task','Arrived','Departed','Contractor reported','Notes']].concat(data.contractors.map(function(r){return [r.name,r.company,r.task,r.in,r.out,r.status,r.note||''];}));var csv=rows.map(function(a){return a.map(function(x){var t=String(x||'');if(/^[=+\-@]/.test(t))t="'"+t;return '"'+t.replace(/"/g,'""')+'"';}).join(',');}).join('\r\n');var url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));var a=document.createElement('a');a.href=url;a.download='building-watch-demo-visitors.csv';a.click();setTimeout(function(){URL.revokeObjectURL(url);},1000);}
 window.addEventListener('hashchange',render);render();
 })();
