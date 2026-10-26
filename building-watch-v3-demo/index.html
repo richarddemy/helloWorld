@@ -56,6 +56,28 @@ button,a{cursor:pointer}a{color:inherit;text-decoration:none}button:focus-visibl
 .workitem.done{opacity:.7}.workitem.done b{text-decoration:line-through}
 .miniheading{font-weight:800;font-size:15px;margin:14px 0 6px}
 @media(max-width:720px){.availdays{grid-template-columns:repeat(2,minmax(0,1fr))}.paintgrid{border-spacing:2px}.paintgrid td{height:34px}.paintgrid th:first-child{width:50px}.quicklinks button{flex:1}.availtop{align-items:stretch}}
+
+.other-cal-panel{border:1px solid #cbd9e4;background:#f7fafc;padding:17px;border-radius:12px;margin:14px 0}
+.cal-head{display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:10px}
+.cal-head h3{margin:0 0 6px}.cal-head p{max-width:720px;margin:3px 0 12px}
+.cal-sources{display:grid;gap:8px;margin:12px 0}
+.cal-source{background:white;border:1px solid #d8e3eb;border-radius:9px;padding:11px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cal-source label{display:flex;gap:9px;align-items:center;flex:1;min-width:0}
+.cal-source input{width:19px;height:19px;accent-color:#24669e;flex-shrink:0}
+.cal-source b,.cal-source small{display:block}.cal-source b{font-size:13px}
+.cal-source small{font-size:11px;color:#667b8c;margin-top:2px}
+.cal-file,.cal-url{border-top:1px solid #dde8f0;padding-top:10px;margin-top:12px}
+.cal-file .field,.cal-url .field{max-width:640px}
+.cal-url summary{cursor:pointer;font-weight:800;color:#256c9f;font-size:13px}
+.cal-urlform{display:grid;gap:10px;margin:12px 0}
+.cal-urlform button{justify-self:start}
+.cal-swatch{display:inline-block;vertical-align:middle;width:15px;height:15px;border:1px solid #9eb5c9;border-radius:3px;background:repeating-linear-gradient(135deg,#749dbb 0 2px,#e7edf3 2px 7px)}
+.cal-swatch.conflict{background:repeating-linear-gradient(135deg,#2b70aa 0 3px,#e7ae41 3px 6px)}
+.paintgrid td.other-busy:not(.marked){background:repeating-linear-gradient(135deg,#86a9c7 0 2px,#e7edf3 2px 7px);border-color:#9fb8ce}
+.paintgrid td.other-busy.marked{background:repeating-linear-gradient(135deg,#2b70aa 0 4px,#9bbfdd 4px 7px);border-color:#19598e}
+.paintgrid td.other-conflict{box-shadow:inset 0 0 0 2px #e6ac3a}
+@media(max-width:650px){.other-cal-panel{padding:13px}}
+
 </style></head><body>
 <div class="wrap">
 <header class="bar"><a class="brand" href="#home">◈ BUILDING <i>WATCH</i></a><span class="pill">V3 INTERACTIVE PREVIEW · FICTIONAL DATA</span><a class="toplink" href="#signin">Staff sign-in demo →</a></header>
@@ -130,7 +152,7 @@ function availability(){
   rows+='</tr>';
  }
  rows+='</tbody>';
- return heading('My availability','Swipe or drag over blocks to mark when you are free to be in the building')+
+ return heading('My availability','Swipe your free time while viewing events from other calendars')+
  '<div class="panel"><div class="availtop"><div><h3>Week of '+clean(key)+'</h3><div class="subtitle">Blue = available · Gray = unmarked. Swipe again to erase.</div></div><div class="buttonrow"><button class="btn small" id="availPrev">← Previous</button><button class="btn small" id="availNext">Next →</button></div></div>'+
  '<div class="availbar"><strong>1. Mark your free time → 2. Review the list → 3. Save</strong><p class="subtitle">Touch and swipe on your phone, or click and drag with a mouse. Each block is 30 minutes. Tap a block to toggle it. You can also use Enter or Space on a focused block.</p></div>'+
  '<div class="tablewrap"><table id="availGrid" class="paintgrid">'+rows+'</table></div>'+
@@ -229,4 +251,4 @@ function attach(){
 function exportCsv(){var rows=[['Name','Company','Task','Arrived','Departed','Contractor reported','Notes']].concat(data.contractors.map(function(r){return [r.name,r.company,r.task,r.in,r.out,r.status,r.note||''];}));var csv=rows.map(function(a){return a.map(function(x){var t=String(x||'');if(/^[=+\-@]/.test(t))t="'"+t;return '"'+t.replace(/"/g,'""')+'"';}).join(',');}).join('\r\n');var url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));var a=document.createElement('a');a.href=url;a.download='building-watch-demo-visitors.csv';a.click();setTimeout(function(){URL.revokeObjectURL(url);},1000);}
 window.addEventListener('hashchange',render);render();
 })();
-</script></body></html>
+</script><script src="./calendar-overlay.js"></script></body></html>
