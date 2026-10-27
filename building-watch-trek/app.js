@@ -42,6 +42,46 @@ function download(name, text) {
   catch (e) { copy(text, "Copied as CSV"); }
 }
 
+/* ---------- Starfleet communications loading screen ---------- */
+let loadDepth = 0, loadTimer = null, loadStep = 0;
+const loadLines = [
+  "Opening a channel to Starbase 001…",
+  "Contacting Starfleet Command…",
+  "Authenticating command credentials…",
+  "Requesting duty rosters from the main computer…",
+  "Synchronizing personnel and maintenance records…",
+  "Calibrating long-range calendar sensors…",
+  "Awaiting subspace transmission…",
+  "Routing data through the Enterprise computer core…",
+  "Checking for temporal anomalies…",
+  "Still awaiting confirmation from Starfleet Command…"
+];
+function loadMessage(message) {
+  const el = $("starfleetLoadText");
+  if (el) el.textContent = message;
+}
+function beginLoading(message) {
+  if (++loadDepth !== 1) return;
+  loadStep = 0;
+  const screen = $("starfleetLoading");
+  if (!screen) return;
+  loadMessage(message || loadLines[0]);
+  screen.hidden = false;
+  document.body.setAttribute("aria-busy", "true");
+  loadTimer = setInterval(() => {
+    loadStep = Math.min(loadStep + 1, loadLines.length - 1);
+    loadMessage(loadLines[loadStep]);
+  }, 2100);
+}
+function endLoading() {
+  if (!loadDepth) return;
+  if (--loadDepth) return;
+  clearInterval(loadTimer); loadTimer = null;
+  const screen = $("starfleetLoading");
+  if (screen) screen.hidden = true;
+  document.body.removeAttribute("aria-busy");
+}
+
 /* ---------- API ---------- */
 let TOKEN = null;
 const API = {
@@ -171,6 +211,7 @@ async function startAuth(msg) {
 }
 async function afterToken() {
   gate(`<p class="sub">Checking your access…</p>`);
+  beginLoading("Contacting Starfleet Command…");
   try {
     const w = await API.call("whoami");
     if (w.status === "denied") return gate(`<p><b>You don't have access yet.</b></p><p>You signed in as <b>${esc(w.email)}</b>. Ask an admin to add this exact address, or sign in with the account they approved.</p><button class="btn" id="swAcct">Use a different account</button>`), $("swAcct").onclick = () => signOut();
@@ -179,7 +220,7 @@ async function afterToken() {
   } catch (e) {
     if (e.code === "auth") return signOut(e.message);
     gate(`<p class="chip warn" style="white-space:normal">${esc(e.message)}</p><button class="btn" id="retry">Try again</button>`); $("retry").onclick = afterToken;
-  }
+  } finally { endLoading(); }
 }
 function profileGate(me) {
   gate(`<h2>Welcome aboard</h2><p class="sub">You're signed in as <b>${esc(me.email)}</b>. Finish your profile to get started.</p>
@@ -196,11 +237,16 @@ function signOut(msg) {
 
 /* ---------- boot and load ---------- */
 async function boot() {
-  $("gate").hidden = true; $("app").hidden = false;
-  $("demoBar").hidden = !DEMO; $("signOut").hidden = DEMO;
-  await loadWeek();
+  beginLoading();
+  try {
+    $("gate").hidden = true; $("app").hidden = false;
+    $("demoBar").hidden = !DEMO; $("signOut").hidden = DEMO;
+    await loadWeek();
+  } finally { endLoading(); }
 }
 async function loadWeek(keepTab) {
+  beginLoading("Requesting duty rosters from the main computer…");
+  try {
   const d = await act(() => API.call("load", { week: week() }));
   if (!d) return;
   D = d;
@@ -209,7 +255,12 @@ async function loadWeek(keepTab) {
   const tabs = tabList().map(x => x[0]);
   if (!tab || !tabs.includes(tab)) tab = tabs[0];
   render();
-  if ((D.me.cals || []).some(c => c.on)) API.call("busy", { week: week() }).then(b => { busy = b || []; if (tab === "week") drawPaint(); }).catch(() => {});
+  if ((D.me.cals || []).some(c => c.on)) {
+    loadMessage("Calibrating long-range calendar sensors…");
+    try { busy = await API.call("busy", { week: week() }) || []; if (tab === "week") drawPaint(); }
+    catch (e) { toast("Calendar overlays could not be loaded. Your schedule is still available.", "err"); }
+  }
+  } finally { endLoading(); }
 }
 function tabList() {
   const t = [["week", "My week"]];
