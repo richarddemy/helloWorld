@@ -40,7 +40,7 @@ var Core = (function () {
     };
   }
   function ensure(st) {
-    ["people", "avail", "watches", "requests", "log", "audit"].forEach(function (k) { st[k] = st[k] || []; });
+    ["people", "avail", "watches", "requests", "log", "audit", "crewAssignments", "crewActivity"].forEach(function (k) { st[k] = st[k] || []; });
     var d = defaults(), s = st.settings || {};
     Object.keys(d).forEach(function (k) { if (s[k] === undefined || s[k] === "") s[k] = d[k]; });
     if (!s.acting || typeof s.acting !== "object") s.acting = { pid: "", from: "", to: "" };
@@ -163,6 +163,8 @@ var Core = (function () {
           watches: st.watches.filter(function (w) { return inWk(w.date); })
             .map(function (w) { return { id: w.id, pid: w.pid, date: w.date, s: +w.s, e: +w.e, checks: w.checks || {} }; }),
           monthCounts: counts,
+          crewAssignments: st.crewAssignments.filter(function (x) { return admin || (x.assignees || []).indexOf(me.id) >= 0; }).map(function (x) { return Object.assign({}, x); }),
+          crewActivity: st.crewActivity.filter(function (x) { return admin || st.crewAssignments.some(function (a) { return a.id === x.assignmentId && (a.assignees || []).indexOf(me.id) >= 0; }); }).slice(-500),
           requests: st.requests.slice(-400),
           log: st.log.filter(function (l) { return !isOut(l) || l.date >= since; }).slice(-400),
           settings: publicSettings(st, admin)
@@ -234,6 +236,71 @@ var Core = (function () {
         st.settings.tmpl = (P.tmpl || []).map(function (x) { return str(x, 200); }).filter(String).slice(0, 40);
         touch(st, "settings");
         return st.settings.tmpl;
+      }
+
+      /* Crew assignments are separate from maintenance requests and watch duties. */
+      case "crew.create": {
+        need();
+        var title = str(P.title, 150), assignees = uniq((P.assignees || []).filter(function (id) { var p = byId(st.people, id); return p && p.active !== false; }));
+        if (!title || !assignees.length) throw E("input", "Enter a title and assign at least one crew member.");
+        if (P.dueDate && !isDate(P.dueDate)) throw E("input", "Invalid due date.");
+        var a = { id: uid(), title: title, description: str(P.description, 3000), location: str(P.location, 150),
+          priority: ["Routine", "Urgent", "Emergency"].indexOf(P.priority) >= 0 ? P.priority : "Routine",
+          dueDate: P.dueDate || "", assignees: assignees, status: "Assigned",
+          createdBy: me.id, createdAt: H.nowISO(), submittedBy: "", submittedAt: "",
+          approvedBy: "", approvedAt: "", returnNote: "", updatedAt: H.nowISO() };
+        st.crewAssignments.push(a); touch(st, "crewAssignments");
+        st.crewActivity.push({ eventId: uid(), assignmentId: a.id, personId: me.id, action: "Created", note: "", timestamp: H.nowISO() });
+        touch(st, "crewActivity"); audit(st, me, "crew.create", a.id, H); return a;
+      }
+      case "crew.update": {
+        need();
+        var a = byId(st.crewAssignments, P.id);
+        if (!a) throw E("missing", "Assignment not found.");
+        if (a.status === "Approved") throw E("input", "Approved assignments are closed.");
+        if (P.title !== undefined) { a.title = str(P.title, 150); if (!a.title) throw E("input", "Title required."); }
+        if (P.description !== undefined) a.description = str(P.description, 3000);
+        if (P.location !== undefined) a.location = str(P.location, 150);
+        if (P.priority !== undefined) a.priority = ["Routine", "Urgent", "Emergency"].indexOf(P.priority) >= 0 ? P.priority : "Routine";
+        if (P.dueDate !== undefined) { if (P.dueDate && !isDate(P.dueDate)) throw E("input", "Invalid date."); a.dueDate = P.dueDate; }
+        if (P.assignees !== undefined) {
+          a.assignees = uniq((P.assignees || []).filter(function (id) { var p = byId(st.people, id); return p && p.active !== false; }));
+          if (!a.assignees.length) throw E("input", "Assign at least one person.");
+        }
+        a.updatedAt = H.nowISO(); touch(st, "crewAssignments");
+        st.crewActivity.push({ eventId: uid(), assignmentId: a.id, personId: me.id, action: "Updated", note: str(P.note, 1000), timestamp: H.nowISO() });
+        touch(st, "crewActivity"); return a;
+      }
+      case "crew.progress":
+      case "crew.submit": {
+        var a = byId(st.crewAssignments, P.id);
+        if (!a) throw E("missing", "Assignment not found.");
+        if (!admin && (a.assignees || []).indexOf(me.id) < 0) throw E("forbidden", "Not assigned to this project.");
+        if (a.status === "Approved") throw E("input", "This project is closed.");
+        if (a.status === "Pending approval") throw E("input", "Awaiting supervisor review.");
+        var note = str(P.note, 1500);
+        if (action === "crew.progress" && !note) throw E("input", "Enter a progress note.");
+        if (action === "crew.submit") { a.status = "Pending approval"; a.submittedBy = me.id; a.submittedAt = H.nowISO(); a.returnNote = ""; }
+        else if (a.status !== "In progress") a.status = "In progress";
+        a.updatedAt = H.nowISO(); touch(st, "crewAssignments");
+        st.crewActivity.push({ eventId: uid(), assignmentId: a.id, personId: me.id, action: action === "crew.submit" ? "Submitted" : "Progress", note: note, timestamp: H.nowISO() });
+        touch(st, "crewActivity"); return a;
+      }
+      case "crew.review": {
+        need();
+        var a = byId(st.crewAssignments, P.id);
+        if (!a) throw E("missing", "Assignment not found.");
+        if (a.status !== "Pending approval") throw E("input", "Assignment has not been submitted.");
+        if (P.decision !== "approve" && P.decision !== "return") throw E("input", "Invalid decision.");
+        var note = str(P.note, 1500);
+        if (P.decision === "return" && !note) throw E("input", "Explain what needs correction.");
+        a.status = P.decision === "approve" ? "Approved" : "Returned";
+        a.returnNote = P.decision === "return" ? note : "";
+        a.approvedBy = P.decision === "approve" ? me.id : "";
+        a.approvedAt = P.decision === "approve" ? H.nowISO() : "";
+        a.updatedAt = H.nowISO(); touch(st, "crewAssignments");
+        st.crewActivity.push({ eventId: uid(), assignmentId: a.id, personId: me.id, action: P.decision === "approve" ? "Approved" : "Returned", note: note, timestamp: H.nowISO() });
+        touch(st, "crewActivity"); audit(st, me, "crew.review", a.id + " " + a.status, H); return a;
       }
 
       /* ---------- service requests ---------- */
