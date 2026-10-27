@@ -380,7 +380,9 @@ function openCI() {
   const shops = [...new Set(D.log.map(l => l.shop).filter(Boolean))];
   openModal("Check in a worker", "Log maintenance or contractor personnel when they arrive.", `<div class="form">
     <label>Worker name<input id="ciName" placeholder="e.g. J. Ramos"></label>
-    <label>Shop or company<input id="ciShop" placeholder="e.g. PW HVAC shop" list="shops"></label>
+    <label>Shop or company<input id="ciShop" placeholder="e.g. Starfleet Engineering" list="shops"></label>
+    <label>Email (optional)<input id="ciEmail" type="email" placeholder="person@domain.com"></label>
+    <label class="inline"><input id="ciEmailConsent" type="checkbox"> Worker agrees to receive a real test confirmation and sign-out link</label>
     <datalist id="shops">${shops.map(s => `<option value="${esc(s)}">`).join("")}</datalist>
     <label class="full">Service request<select id="ciReq"><option value="">Not tied to a request</option>${open.map(r => `<option value="${r.id}">${esc((r.wo ? r.wo + " · " : "") + r.loc + ": " + r.issue)}</option>`).join("")}</select></label>
     <label class="full">What are they here to do?<input id="ciTask" placeholder="e.g. Replace thermostat, Rm 210"></label></div>`,
@@ -388,7 +390,8 @@ function openCI() {
 }
 async function saveCI() {
   const worker = $("ciName").value.trim(); if (!worker) { $("ciName").focus(); toast("Enter the worker's name", "err"); return; }
-  const p = { worker, shop: $("ciShop").value, req: $("ciReq").value, task: $("ciTask").value };
+  const p = { worker, shop: $('ciShop').value, req: $('ciReq').value, task: $('ciTask').value,
+    email: $('ciEmail').value.trim(), emailConsent: $('ciEmailConsent').checked };
   closeModal();
   await act(() => API.call("log.in", p), `${worker} checked in`); await loadWeek();
 }
@@ -556,7 +559,7 @@ function drawAdmin() {
     <label>App link used in invitations<input id="adUrl" value="${esc(st.appUrl)}"></label>
     <button class="btn primary" id="adCalSave" style="align-self:flex-start">Save calendar settings</button></div></div>
   <div class="panel"><h2>Data storage</h2>
-    <div class="sub" style="margin-top:-8px">Everything is kept in one Google Sheet. It can live in anyone's Drive as long as it's shared with the app owner as Editor.</div>
+    <div class="sub" style="margin-top:-8px">Test data is divided across five private Google Sheets. Change spreadsheet IDs in the private Apps Script backend, not here.</div>
     <div class="form"><label class="full">Sheet URL or ID<input id="adSheet" placeholder="https://docs.google.com/spreadsheets/d/…"></label></div>
     <div class="row start"><button class="btn" id="adTest">Test connection</button><button class="btn primary" id="adMove">Switch to this Sheet</button></div>
     <div id="adTestOut" class="why">${DEMO ? "Demo mode: no Google Sheet is connected." : "Run a test to see which Sheet and calendar the app is using."}</div>
@@ -572,7 +575,7 @@ function drawAdmin() {
     <h3>Add someone</h3>
     <div class="form addrow"><label>Rank and name<input id="npName" placeholder="e.g. MU2 Garcia"></label><label>Google email<input id="npEmail" placeholder="name@gmail.com"></label>
       <label>Role<select id="npRole"><option>Member</option><option>Admin</option></select></label><button class="btn primary" id="npAdd">Add</button></div>
-    <label class="inline"><input type="checkbox" id="npInv" checked> Email them an invitation with the sign-in link</label></div>
+    <label class="inline"><input type="checkbox" id="npInv"> Send a real invitation email (only with the recipient's permission)</label></div>
   <div class="panel"><h2>Email the shop</h2>
     <div class="pick" id="mailPick"><button class="pk" data-mt="*" aria-pressed="${active.length && mailTo.size === active.length}">Everyone</button>${active.map(p => `<button class="pk" data-mt="${p.id}" aria-pressed="${mailTo.has(p.id)}">${esc(p.name)}</button>`).join("")}</div>
     <div class="form"><label>Template<select id="mlTpl"><option value="avail">Enter your time for next week</option><option value="watch">Watch bill posted</option><option value="custom">Blank</option></select></label>
