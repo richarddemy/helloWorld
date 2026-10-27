@@ -657,7 +657,7 @@ $("s-admin").addEventListener("click", async e => {
       `${r.created} Google Calendar events created${r.failed ? ', ' + r.failed + ' failed' : ''}.`);
     if (result) await loadWeek();
   }
-  if (t.id === "adTest") { const r = await act(() => API.call("admin.test")); if (r) $("adTestOut").innerHTML = r.demo ? "Demo mode: no Google Sheet is connected." : `App owner: <b>${esc(r.owner)}</b><br>Sheet: <b>${esc(r.sheet)}</b><br>Calendar: ${r.calendar ? `<b>${esc(r.calendar)}</b>` : `<span style="color:var(--warn)">${esc(r.calendarError)}</span>`}<br>Emails left today: ${r.mailLeft} · Time zone: ${esc(r.timeZone)}`; }
+  if (t.id === "adTest") { const r = await act(() => API.call("admin.test")); if (r) $("adTestOut").innerHTML = r.demo ? "Demo mode: no Google Sheet is connected." : `App owner: <b>${esc(r.owner)}</b><br>Sheet: <b>${esc(r.sheet)}</b><br>Calendar: ${r.calendar ? `<b>${esc(r.calendar)}</b>` : `<span style="color:var(--warn)">${esc(r.calendarError)}</span>`}<br>Emails left today: ${r.mailLeft} · Time zone: ${esc(r.timeZone)}${r.formUrl ? `<br><a href="${esc(r.formUrl)}" target="_blank" rel="noopener">Worker QR check-in Google Form</a>` : ''}`; }
 
   if (t.id === "npAdd") {
     const email = $("npEmail").value.trim(); if (!email) { $("npEmail").focus(); toast("Enter their Google email", "err"); return; }
