@@ -71,7 +71,26 @@ const Demo = {
   async call(action, payload) {
     if (!this.st) this.load();
     await new Promise(r => setTimeout(r, 120));
-    if (action === "admin.test") return { demo: true };
+    if (action === 'admin.test') return { demo: true };
+    if (action === 'admin.calendars') return [
+      { id: 'enterprise-test', name: 'USS Enterprise — Fictional Calendar', primary: false },
+      { id: 'voyager-test', name: 'USS Voyager — Fictional Calendar', primary: false }
+    ];
+    if (action === 'admin.previewPublish') return {
+      ready: this.st.watches.filter(w => !w.ev && w.date >= DH.today()).length,
+      published: this.st.watches.filter(w => !!w.ev).length
+    };
+    if (action === 'admin.publish') {
+      const person = Core.findEmail(this.st, this.emails[this.as]);
+      if (!person || person.role !== 'Admin') throw new Error('Administrator permission required.');
+      if (!this.st.settings.calId) throw new Error('Choose a calendar before publishing.');
+      let created = 0;
+      this.st.watches.forEach(w => {
+        if (!w.ev && w.date >= DH.today()) { w.ev = 'demo-' + w.id; created++; }
+      });
+      this.save();
+      return { created, failed: 0, demo: true, calendar: this.st.settings.calName };
+    }
     if (action === "admin.dataSource") throw Object.assign(new Error("Demo mode has no Google Sheet. This works once the app is set up."), { code: "demo" });
     const st = this.st; st._dirty = {}; st._warn = [];
     try {
@@ -355,7 +374,7 @@ $("dlgBody").addEventListener("input", e => { if (e.target.id === "coProb") $("c
 async function saveWatch() {
   const { d, s, e } = sel, pids = [...$("dlgBody").querySelectorAll(".cand input:checked")].map(i => i.value);
   closeModal();
-  await act(() => API.call("watch.save", { date: week()[d], s, e, pids }), () => pids.length ? `Watch set: ${pids.map(pname).join(", ")}${D.settings.invites ? ". Invitations sent." : ""}` : "Watch cleared");
+  await act(() => API.call("watch.save", { date: week()[d], s, e, pids }), () => pids.length ? `Watch draft saved: ${pids.map(pname).join(', ')} (not published)` : 'Watch cleared');
   await loadWeek();
 }
 
@@ -536,6 +555,7 @@ $("s-mine").addEventListener("click", async e => {
 $("s-mine").addEventListener("change", e => { const k = e.target.dataset.mcal; if (k != null) { const cals = D.me.cals.slice(); cals[+k] = Object.assign({}, cals[+k], { on: e.target.checked }); saveCals(cals, e.target.checked ? "Calendar shown" : "Calendar hidden"); } });
 
 /* ---------- Admin ---------- */
+let CAL_CHOICES = null;
 const TEMPLATES = {
   avail: { s: "Building Watch: enter your time for next week", b: "Shipmates,\n\nPlease paint the times you'll be in the building next week by Friday COB.\n\nOpen Building Watch, go to My week, drag over your hours, and press Save.\n{url}\n\nV/r,\n{from}" },
   watch: { s: "Watch bill posted", b: "Shipmates,\n\nNext week's building watch bill is posted. Check your calendar for invitations and accept them.\n{url}\n\nV/r,\n{from}" },
@@ -552,18 +572,24 @@ function drawAdmin() {
     <div class="row start"><button class="btn primary" id="adActSave">Save</button>${a.pid ? `<button class="btn" id="adActClear">End acting</button>` : ""}</div></div>
   <div class="panel"><h2>Main calendar</h2>
     <label>Calendar name<input id="adCalName" value="${esc(st.calName)}"></label>
-    <label>Google Calendar ID<input id="adCalId" value="${esc(st.calId)}" placeholder="…@group.calendar.google.com"></label>
-    <div class="why">The calendar's owner shares it with the app owner (Make changes and manage sharing). Find the ID in Calendar settings, Integrate calendar.</div>
+    <label>Publish assignments to this Google Calendar
+      <select id="adCalId"><option value="">Select a calendar…</option>${CAL_CHOICES ? CAL_CHOICES.map(c => `<option value="${esc(c.id)}" ${c.id === st.calId ? 'selected' : ''}>${esc(c.name)}${c.primary ? ' (primary)' : ''}</option>`).join('') : (st.calId ? `<option value="${esc(st.calId)}" selected>${esc(st.calName)} (saved)</option>` : '')}</select>
+    </label>
+    <div class="row start"><button class="btn" id="adCalLoad">Load my calendars</button>
+      <span class="why">Choose an owned Google Calendar. A separate test calendar is recommended.</span></div>
+    <div class="why">Sailor availability is never published automatically. Watch assignments remain drafts until an administrator clicks Publish.</div>
     <label class="inline"><input type="checkbox" id="adInv" ${st.invites ? "checked" : ""}> Send watch assignments as private calendar invitations</label>
     <label>Invitation reminder<select id="adRem">${opt([["0", "None"], ["15", "15 minutes before"], ["30", "30 minutes before"], ["60", "1 hour before"], ["1440", "1 day before"]], String(st.remind))}</select></label>
     <label>App link used in invitations<input id="adUrl" value="${esc(st.appUrl)}"></label>
-    <button class="btn primary" id="adCalSave" style="align-self:flex-start">Save calendar settings</button></div></div>
+    <div class="row start"><button class="btn primary" id="adCalSave">Save calendar settings</button>
+      <button class="btn primary" id="adCalPublish">Publish pending assignments</button></div>
+    <div id="adCalPubMsg" class="why">${st.calId ? 'Calendar selected: ' + esc(st.calName) : 'Select and save a calendar to enable publication.'}</div>
+    </div></div>
   <div class="panel"><h2>Data storage</h2>
     <div class="sub" style="margin-top:-8px">Test data is divided across five private Google Sheets. Change spreadsheet IDs in the private Apps Script backend, not here.</div>
-    <div class="form"><label class="full">Sheet URL or ID<input id="adSheet" placeholder="https://docs.google.com/spreadsheets/d/…"></label></div>
-    <div class="row start"><button class="btn" id="adTest">Test connection</button><button class="btn primary" id="adMove">Switch to this Sheet</button></div>
+    <div class="row start"><button class="btn" id="adTest">Test backend and permissions</button></div>
     <div id="adTestOut" class="why">${DEMO ? "Demo mode: no Google Sheet is connected." : "Run a test to see which Sheet and calendar the app is using."}</div>
-    <div class="why">Switching to an empty Sheet copies all current data into it. Switching to a Sheet that already has Building Watch data uses that data instead.</div></div>
+    <div class="why">Spreadsheet IDs are configured on the private backend, not from this public webpage.</div></div>
   <div class="panel"><div class="row"><h2>People and roles</h2><span class="why">Only people on this list can sign in. Admins can assign watches, edit duties and change settings.</span></div>
     <div class="scroll"><table class="tbl"><tr><th>Name</th><th>Google email</th><th>Role</th><th>Stands watch</th><th>Status</th><th></th></tr>
     ${D.people.map(p => `<tr><td><input data-pf="name" data-pid="${p.id}" value="${esc(p.name)}" style="min-width:130px" aria-label="Name">${p.id === st.manager ? ' <span class="chip gold">Manager</span>' : ""}${p.id === a.pid ? ' <span class="chip">Acting</span>' : ""}</td>
@@ -598,9 +624,41 @@ $("s-admin").addEventListener("click", async e => {
   const t = e.target, d = t.dataset;
   if (t.id === "adActSave") { await act(() => API.call("settings.save", { manager: $("adMgr").value, acting: { pid: $("adActWho").value, from: $("adActFrom").value, to: $("adActTo").value } }), "Saved"); await loadWeek(); }
   if (t.id === "adActClear") { await act(() => API.call("settings.save", { acting: { pid: "", from: "", to: "" } }), "Acting manager ended"); await loadWeek(); }
-  if (t.id === "adCalSave") { await act(() => API.call("settings.save", { calName: $("adCalName").value, calId: $("adCalId").value.trim(), invites: $("adInv").checked, remind: $("adRem").value, appUrl: $("adUrl").value.trim() }), "Calendar settings saved"); await loadWeek(); }
+  if (t.id === 'adCalLoad') {
+    const result = await act(() => API.call('admin.calendars'));
+    if (result) {
+      CAL_CHOICES = result;
+      const select = $('adCalId'), currentId = select.value;
+      select.innerHTML = '<option value="">Select a calendar…</option>' +
+        result.map(c => `<option value="${esc(c.id)}" ${c.id === currentId ? 'selected' : ''}>${esc(c.name)}${c.primary ? ' (primary)' : ''}</option>`).join('');
+      toast(result.length ? 'Choose the calendar you want to use' : 'No owned calendars were found', result.length ? '' : 'err');
+    }
+  }
+  if (t.id === 'adCalSave') {
+    const id = $('adCalId').value.trim();
+    if (!id) { toast('Choose a calendar first', 'err'); return; }
+    const choice = (CAL_CHOICES || []).find(c => c.id === id);
+    const r = await act(() => API.call('settings.save', {
+      calId: id, calName: choice ? choice.name : $('adCalName').value,
+      invites: $('adInv').checked, remind: $('adRem').value, appUrl: $('adUrl').value.trim()
+    }), 'Calendar saved');
+    if (r) await loadWeek();
+  }
+  if (t.id === 'adCalPublish') {
+    const id = $('adCalId').value.trim();
+    if (!id || id !== D.settings.calId) { toast('Save the selected calendar first', 'err'); return; }
+    const preview = await act(() => API.call('admin.previewPublish'));
+    if (!preview) return;
+    if (!preview.ready) { toast('No unpublished upcoming assignments'); return; }
+    const invites = D.settings.invites ? ' Invitations will be sent to valid email addresses.' : '';
+    if (!confirm(`Publish ${preview.ready} pending assignments to "${D.settings.calName}"?${invites}`)) return;
+    const result = await act(() => API.call('admin.publish'), r => r.demo ?
+      `Demo: ${r.created} assignments marked published (no real events).` :
+      `${r.created} Google Calendar events created${r.failed ? ', ' + r.failed + ' failed' : ''}.`);
+    if (result) await loadWeek();
+  }
   if (t.id === "adTest") { const r = await act(() => API.call("admin.test")); if (r) $("adTestOut").innerHTML = r.demo ? "Demo mode: no Google Sheet is connected." : `App owner: <b>${esc(r.owner)}</b><br>Sheet: <b>${esc(r.sheet)}</b><br>Calendar: ${r.calendar ? `<b>${esc(r.calendar)}</b>` : `<span style="color:var(--warn)">${esc(r.calendarError)}</span>`}<br>Emails left today: ${r.mailLeft} · Time zone: ${esc(r.timeZone)}`; }
-  if (t.id === "adMove") { const v = $("adSheet").value.trim(); if (!v) { toast("Paste the Sheet URL or ID", "err"); return; } const r = await act(() => API.call("admin.dataSource", { sheet: v })); if (r) { toast(r.moved ? `Data copied to ${r.name}` : `Now using ${r.name}`); await loadWeek(); } }
+
   if (t.id === "npAdd") {
     const email = $("npEmail").value.trim(); if (!email) { $("npEmail").focus(); toast("Enter their Google email", "err"); return; }
     const r = await act(() => API.call("person.add", { email, name: $("npName").value, role: $("npRole").value, invite: $("npInv").checked }), p => `${p.name} added${$("npInv") && $("npInv").checked ? " and invited" : ""}`);
