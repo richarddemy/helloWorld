@@ -19,3 +19,19 @@ The frontend is served by GitHub Pages at `building-watch-trek/`. The backend ru
 Check token verification, per-operation authorization, Admin/Member permissions, invitation flow, public endpoint access, Google Sheets/Calendar scopes, logging, and data handling.
 
 The Star Trek demo uses fictional records and is not approved for operational Navy personnel data.
+
+## Google Sheets used by the test
+
+The deployed Star Trek test uses **five Google Sheets** as its data store. Their actual links are intentionally **not published in this public repository**: sheet IDs identify live resources, and access is controlled separately by Google Drive sharing permissions.
+
+For authorized IT reviewers, provide the five sheet URLs through an approved private channel, with Viewer access to fictional test data only. Do not grant Editor access or share live operational records. A link alone does not grant access to a private Sheet.
+
+| Test Sheet | Review link |
+| --- | --- |
+| Sheet 1 | Share privately with authorized reviewer |
+| Sheet 2 | Share privately with authorized reviewer |
+| Sheet 3 | Share privately with authorized reviewer |
+| Sheet 4 | Share privately with authorized reviewer |
+| Sheet 5 | Share privately with authorized reviewer |
+
+The reviewer should compare the actual Sheet schema against the deployed Apps Script configuration once its source has been exported.
