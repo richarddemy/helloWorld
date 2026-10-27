@@ -300,10 +300,47 @@ $("myWatches").addEventListener("change", e => {
 let painting = null; const pg = $("paintGrid");
 const cellAt = e => { const el = document.elementFromPoint(e.clientX, e.clientY); return el && el.closest ? el.closest("#paintGrid td[data-k]") : null; };
 function apply(el) { if (!el) return; const [date, i] = el.dataset.k.split("|"); myDays[date][+i] = painting === "add" ? "1" : "0"; el.classList.toggle("on", painting === "add"); dirty = true; }
-pg.addEventListener("pointerdown", e => { const el = cellAt(e); if (!el) return; e.preventDefault(); const [date, i] = el.dataset.k.split("|"); painting = mineAt(date, +i) ? "del" : "add"; pg.setPointerCapture(e.pointerId); apply(el); });
-pg.addEventListener("pointermove", e => { if (painting) apply(cellAt(e)); });
-const pend = () => { if (painting) { painting = null; drawPaint(); } };
-pg.addEventListener("pointerup", pend); pg.addEventListener("pointercancel", pend);
+// Touch: horizontal one-finger motion scrolls the grid; vertical motion paints availability.
+// A tap toggles one cell. Two-finger gestures remain available for browser pinch zoom.
+let paintTouch = null;
+pg.addEventListener("pointerdown", e => {
+  const el = cellAt(e); if (!el || (e.pointerType === "mouse" && e.button !== 0)) return;
+  if (e.pointerType === "touch") {
+    if (paintTouch) { paintTouch = null; painting = null; return; }
+    paintTouch = { id:e.pointerId, x:e.clientX, y:e.clientY, el, mode:"pending" };
+    return;
+  }
+  e.preventDefault();
+  const [date, i] = el.dataset.k.split("|");
+  painting = mineAt(date, +i) ? "del" : "add";
+  pg.setPointerCapture(e.pointerId); apply(el);
+});
+pg.addEventListener("pointermove", e => {
+  if (paintTouch && e.pointerId === paintTouch.id) {
+    const t = paintTouch, dx = e.clientX - t.x, dy = e.clientY - t.y;
+    if (t.mode === "pending" && Math.hypot(dx,dy) > 9) {
+      if (Math.abs(dx) > Math.abs(dy)) { t.mode = "scroll"; return; }
+      t.mode = "paint";
+      const [date, i] = t.el.dataset.k.split("|");
+      painting = mineAt(date, +i) ? "del" : "add";
+      apply(t.el);
+    }
+    if (t.mode === "paint") apply(cellAt(e));
+    return;
+  }
+  if (painting) apply(cellAt(e));
+});
+pg.addEventListener("pointerup", e => {
+  if (paintTouch && e.pointerId === paintTouch.id) {
+    if (paintTouch.mode === "pending") {
+      const el = paintTouch.el, [date, i] = el.dataset.k.split("|");
+      painting = mineAt(date, +i) ? "del" : "add"; apply(el);
+    }
+    paintTouch = null;
+  }
+  if (painting) { painting = null; drawPaint(); }
+});
+pg.addEventListener("pointercancel", () => { paintTouch = null; if (painting) { painting = null; drawPaint(); } });
 $("clearMe").onclick = () => { week().forEach(d => myDays[d] = ZERO.split("")); dirty = true; drawPaint(); };
 $("copyMon").onclick = () => { const mon = myDays[week()[0]].slice(); week().slice(1).forEach(d => myDays[d] = mon.slice()); dirty = true; drawPaint(); toast("Monday copied to the whole week. Save when ready."); };
 async function saveMyWeek() {
@@ -343,8 +380,37 @@ function drawBill() {
 }
 let drag = null; const hg = $("heatGrid");
 const hcell = e => { const el = document.elementFromPoint(e.clientX, e.clientY); return el && el.closest ? el.closest("#heatGrid td") : null; };
-hg.addEventListener("pointerdown", e => { const td = hcell(e); if (!td) return; e.preventDefault(); hg.setPointerCapture(e.pointerId); const d = +td.dataset.d, i = +td.dataset.i; drag = { d, a: i }; sel = { d, s: i, e: i + 1 }; drawHeat(); });
-hg.addEventListener("pointermove", e => { if (!drag) return; const td = hcell(e); if (!td) return; const i = +td.dataset.i, s = Math.min(drag.a, i), en = Math.max(drag.a, i) + 1; if (s !== sel.s || en !== sel.e) { sel = { d: drag.d, s, e: en }; drawHeat(); } });
+let heatTouch = null;
+function beginHeat(td) { const d = +td.dataset.d, i = +td.dataset.i; drag = { d, a: i }; sel = { d, s: i, e: i + 1 }; drawHeat(); }
+hg.addEventListener("pointerdown", e => {
+  const td = hcell(e); if (!td || (e.pointerType === "mouse" && e.button !== 0)) return;
+  if (e.pointerType === "touch") {
+    if (heatTouch) { heatTouch = null; drag = null; return; }
+    heatTouch = { id:e.pointerId, x:e.clientX, y:e.clientY, td, mode:"pending" };
+    return;
+  }
+  e.preventDefault(); hg.setPointerCapture(e.pointerId); beginHeat(td);
+});
+hg.addEventListener("pointermove", e => {
+  if (heatTouch && e.pointerId === heatTouch.id) {
+    const t = heatTouch, dx = e.clientX-t.x, dy = e.clientY-t.y;
+    if (t.mode === "pending" && Math.hypot(dx,dy)>9) {
+      if (Math.abs(dx)>Math.abs(dy)) { t.mode="scroll"; return; }
+      t.mode="select"; beginHeat(t.td);
+    }
+    if (t.mode !== "select") return;
+  }
+  if (!drag) return; const td = hcell(e); if (!td) return;
+  const i = +td.dataset.i, s = Math.min(drag.a, i), en = Math.max(drag.a, i) + 1;
+  if (s !== sel.s || en !== sel.e) { sel = { d: drag.d, s, e: en }; drawHeat(); }
+});
+hg.addEventListener("pointerup", e => {
+  if (heatTouch && e.pointerId === heatTouch.id) {
+    if (heatTouch.mode === "pending") beginHeat(heatTouch.td);
+    heatTouch = null;
+  }
+});
+hg.addEventListener("pointercancel", () => { heatTouch = null; drag = null; });
 const hend = () => { if (!drag) return; drag = null; openAssign(); };
 hg.addEventListener("pointerup", hend); hg.addEventListener("pointercancel", hend);
 hg.addEventListener("keydown", e => { if (e.key === "Enter") { const td = e.target.closest("td"); if (td) { const i = +td.dataset.i; sel = { d: +td.dataset.d, s: i, e: i + 1 }; drawHeat(); openAssign(); } } });
