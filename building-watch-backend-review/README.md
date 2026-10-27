@@ -2,7 +2,7 @@
 
 This folder is reserved for the Google Apps Script source used by the Star Trek-themed Building Watch demonstration.
 
-**Status: backend source not yet uploaded.** The earlier ZIP archive available for review contains a different, older single-sheet implementation, while the deployed Star Trek test uses five Sheets. Publishing the older code as if it were the deployed backend would mislead IT reviewers.
+**Status: backend source pending upload.** The correct `Building-Watch-Star-Trek-Live-Calendar-QR-v2.zip` package has been located and verified to contain `Code.gs`, `Core.gs`, and `appsscript.json`. The review folder should contain only those three source files and this README.
 
 ## What belongs here
 - `Code.gs` — actual deployed API and authorization code
@@ -10,7 +10,7 @@ This folder is reserved for the Google Apps Script source used by the Star Trek-
 - `appsscript.json` — manifest, OAuth scopes and services
 
 ## Before publishing
-Export the three files from the current Apps Script project; remove live Sheet/Calendar IDs, personal email addresses, private URLs, credentials, tokens and secrets. Check the full Git diff before committing.
+Use the three backend files from the verified v2 ZIP, without frontend duplicates or old setup instructions. The source package was checked for common embedded secrets. Confirm no live credentials or personal information were subsequently added before publication.
 
 ## Architecture
 The frontend is served by GitHub Pages at `building-watch-trek/`. The backend runs independently as a Google Apps Script web app. Files committed here are a **review copy**, not an automatic deployment.
