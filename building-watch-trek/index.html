@@ -78,7 +78,7 @@ table.grid{border-collapse:separate;border-spacing:3px;width:100%;min-width:520p
 .grid th.today{color:var(--accent)}
 .grid th.t{text-align:right;padding-right:6px;width:46px}
 .grid td{height:24px;border-radius:4px;background:var(--h0);position:relative}
-#paintGrid,#heatGrid{touch-action:none;user-select:none;-webkit-user-select:none}
+#paintGrid,#heatGrid{touch-action:pan-x pinch-zoom;user-select:none;-webkit-user-select:none}\n@media(max-width:600px){table.grid{min-width:700px}.scroll:has(> table.grid){overscroll-behavior-x:contain}}
 #paintGrid td{cursor:crosshair}
 #paintGrid td.on{background:var(--paint)}
 #paintGrid td.asg::after{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--accent)}
