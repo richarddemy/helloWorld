@@ -19,7 +19,7 @@ The application supports:
 - **Calendar publication.** An administrator selects a destination Google Calendar, reviews unpublished assignments, and explicitly publishes them as events. Availability entries alone do not create calendar events.
 - **Maintenance worker records.** The application records outside-worker arrivals, work performed, and departures, including follow-up details.
 - **QR-based worker check-in.** A Google Form can be created for worker arrival information. Where a worker provides an email address and consents, the backend can send a one-time sign-out link. Worker-reported departure and staff acknowledgment are tracked separately.
-- **Facilities requests and tasks.** Users can record maintenance issues, priorities, work-order references, status, and task activity.
+- **Maintenance requests.** Users can record contractor/maintenance issues, priorities, work-order references, status, and task activity.\n- **Crew assignments.** Supervisors assign facility improvement projects to one or more crew members; assigned personnel submit completion for supervisor approval. This is separate from contractor maintenance.
 - **Reporting and export.** Records can be reviewed and exported for operational reporting.
 
 The fictional names and sample records are demonstration content; the scheduling, data-handling, and administrative functions are application features.
@@ -86,3 +86,15 @@ The application uses five spreadsheets. Their links are provided for review; **t
 Review the implementation of Google ID token validation, role-based authorization on each API action, the publicly reachable Apps Script endpoint, deployment-account privileges, Google service scopes, calendar publishing and duplicate-event handling, invitation and email behavior, worker sign-out token handling, audit records, data retention, and error handling.
 
 For functional verification, test member onboarding, administrator restrictions, availability persistence, watch assignment creation, explicit calendar publishing, maintenance check-in and sign-out, and report exports. The current fictional dataset permits these checks without substituting real personnel information.
+
+
+## Crew assignments — staged backend update (October 2026)
+
+Two new tabs have been created in the existing Star Trek demonstration spreadsheets:
+
+- [Crew Assignments](https://docs.google.com/spreadsheets/d/1uYn00bp1XhtO-iv5rrjSUKxFBwSwtSO8TAt6e9dU9pM/edit) in Task Definitions. Stores projects, shared assignee IDs, due dates, statuses, submission, and approval metadata.
+- [Crew Assignment Activity](https://docs.google.com/spreadsheets/d/12BGPkVsYDbgvPJiRAWNVkpKEkCvM8U7An4heEJ1r8QM/edit) in Task Activity. Stores append-only progress and review events.
+
+Frontend code is committed and the in-browser demo uses the new assignment workflow. Backend review source is staged here as `Code.gs`, `Core.gs`, and `appsscript.json`. **This repository does not automatically deploy Google Apps Script.** Before using crew assignments against the live backend, merge the staged changes with the current deployed Apps Script source, verify the data-source mapping and permissions, deploy a new Web App version, and test authorization with both Admin and Member accounts. The staged `Code.gs` is based on the earlier single-spreadsheet backend and is not a guaranteed drop-in replacement for the current five-spreadsheet deployment. Do not overwrite the current live `Code.gs` without merging its integrations.
+
+Backend rules: Admin creates, edits, reassigns, approves, or returns work. A Member receives only assignments containing their person ID and can add progress or submit for review. A submission does not close the assignment; only an Admin approval does. Maintenance requests and worker check-in remain separate. The old recurring watch checklist is no longer displayed in the frontend.
