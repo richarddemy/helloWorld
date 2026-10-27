@@ -258,7 +258,9 @@ var Core = (function () {
         var link = P.req ? byId(st.requests, P.req) : null;
         var l = { id: uid(), date: t, worker: str(P.worker, 80), shop: str(P.shop, 80), req: link ? link.id : "",
           task: str(P.task, 300) || (link ? link.loc + ": " + link.issue : ""), in: H.nowMin(), out: "",
-          done: "", fu: "", ret: "", prob: "", newReq: "", by: nm(me), fuClosed: false };
+          done: '', fu: '', ret: '', prob: '', newReq: '', by: nm(me), fuClosed: false,
+          email: str(P.email, 120).toLowerCase(), emailConsent: !!P.emailConsent,
+          tokenHash: '', tokenExpiry: '', workerOutAt: '', watchOutAt: '', watchSeenAt: '', outBy: '' };
         st.log.push(l);
         if (link && (link.status === "Open" || link.status === "Submitted to PW")) { link.status = "In progress"; touch(st, "requests"); }
         touch(st, "log");
@@ -267,8 +269,8 @@ var Core = (function () {
       case "log.out": {
         var l2 = byId(st.log, P.id);
         if (!l2) throw E("missing", "Log entry not found.");
-        if (isOut(l2)) throw E("input", l2.worker + " is already checked out.");
-        l2.out = Math.max(H.nowMin(), +l2.in);
+        if (l2.watchOutAt) throw E('input', l2.worker + ' has already been checked out by the watchstander.');
+        if (!isOut(l2)) l2.out = Math.max(H.nowMin(), +l2.in);
         l2.done = ["Yes", "Partly", "No"].indexOf(P.done) >= 0 ? P.done : "Yes";
         l2.fu = str(P.fu, 1000); l2.ret = isDate(P.ret) ? P.ret : ""; l2.prob = str(P.prob, 1000);
         if (l2.prob && P.make) l2.newReq = newReq(st, me, t, P.loc, l2.prob, "Routine").id;
