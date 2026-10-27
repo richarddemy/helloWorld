@@ -266,7 +266,7 @@ function tabList() {
   const t = [["week", "My week"]];
   if (D.admin) t.push(["bill", "Watch bill"]);
   t.push(["log", "Maintenance log"]);
-  if (D.admin) t.push(["check", "Watch checklist"]);
+  t.push(["crew", D.admin ? "Crew assignments" : "My assignments"]);
   t.push(["reqs", "Service requests"]);
   if (D.admin) t.push(["reports", "Reports"], ["admin", "Admin"]);
   t.push(["mine", "My settings"]);
@@ -285,9 +285,9 @@ function render() {
   const a = D.settings.acting;
   $("incharge").innerHTML = `Building manager: <b>${esc(D.manager || "not set")}</b>` + (D.inCharge && D.inCharge !== D.manager ? ` · In charge now: <b>${esc(D.inCharge)}</b> (acting${a.to ? " through " + md(a.to) : ""})` : "");
   $("whoChip").textContent = `${D.me.name}${D.admin ? " · Admin" : ""}`;
-  ["week", "bill", "log", "check", "reqs", "reports", "admin", "mine"].forEach(k => $("s-" + k).hidden = k !== tab);
+  ["week", "bill", "log", "crew", "reqs", "reports", "admin", "mine"].forEach(k => $("s-" + k).hidden = k !== tab);
   if (DEMO) { $("demoMember").setAttribute("aria-pressed", Demo.as === "member"); $("demoAdmin").setAttribute("aria-pressed", Demo.as === "admin"); }
-  ({ week: drawWeek, bill: drawBill, log: drawLog, check: drawCheck, reqs: drawReqs, reports: drawReports, admin: drawAdmin, mine: drawMine })[tab]();
+  ({ week: drawWeek, bill: drawBill, log: drawLog, crew: drawCrew, reqs: drawReqs, reports: drawReports, admin: drawAdmin, mine: drawMine })[tab]();
 }
 $("tabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (!b) return; if (dirty && tab === "week" && b.dataset.tab !== "week") toast("You have unsaved time on My week.", "err"); tab = b.dataset.tab; render(); });
 const leaveWeek = fn => () => { if (dirty) { openModal("Unsaved changes", "You painted time you haven't saved.", "", `<span></span><div class="row" style="gap:8px"><button class="btn" data-act="discard">Discard</button><button class="btn primary" data-act="saveThen">Save</button></div>`); pendingNav = fn; return; } fn(); };
@@ -334,12 +334,12 @@ function drawPaint() {
 }
 function drawWeek() {
   drawPaint();
-  const list = D.watches.filter(x => x.pid === D.me.id), T = D.settings.tmpl;
+  const list = D.watches.filter(x => x.pid === D.me.id);
   $("myWatches").innerHTML = list.length ? list.map(w => {
-    const n = T.filter(t => w.checks[t]).length, co = [...new Set(D.watches.filter(x => x.id !== w.id && x.date === w.date && x.s < w.e && x.e > w.s).map(x => pname(x.pid)))];
-    return `<div class="watchcard"><div class="row"><b>${dayLbl(w.date)} · ${span(w)}</b><span class="chip ${n === T.length ? "ok" : ""}">${n}/${T.length} done</span></div>
+    const co = [...new Set(D.watches.filter(x => x.id !== w.id && x.date === w.date && x.s < w.e && x.e > w.s).map(x => pname(x.pid)))];
+    return `<div class="watchcard"><div class="row"><b>${dayLbl(w.date)} · ${span(w)}</b><span class="chip">Scheduled</span></div>
       ${co.length ? `<div class="why">With ${esc(co.join(", "))}</div>` : ""}
-      ${T.map(t => `<label class="inline"><input type="checkbox" data-w="${w.id}" data-t="${esc(t)}" ${w.checks[t] ? "checked" : ""}> ${esc(t)}</label>`).join("")}</div>`;
+      </div>`;
   }).join("") : "<div class='empty'>No watches this week.</div>";
 }
 $("myWatches").addEventListener("change", e => {
@@ -570,6 +570,70 @@ async function saveTmpl(T) { const r = await act(() => API.call("tmpl.save", { t
 $("tmplList").addEventListener("click", e => { const k = e.target.dataset.del; if (k != null) { const T = D.settings.tmpl.slice(); T.splice(+k, 1); saveTmpl(T); } });
 const addDuty = () => { const v = $("tmplNew").value.trim(); if (!v) return; $("tmplNew").value = ""; saveTmpl(D.settings.tmpl.concat([v])); };
 $("tmplAdd").onclick = addDuty; $("tmplNew").addEventListener("keydown", e => { if (e.key === "Enter") addDuty(); });
+
+/* ---------- Crew assignments (distinct from contractor maintenance) ---------- */
+function crewName(id) { return (D.people.find(p => p.id === id) || {}).name || "Crew member"; }
+function drawCrew() {
+  const root = $("s-crew"), assignments = D.crewAssignments || [], admin = D.admin;
+  const sorted = [...assignments].sort((a,b) => (a.status === "Approved") - (b.status === "Approved") || (a.dueDate || "9999").localeCompare(b.dueDate || "9999"));
+  root.innerHTML = `<div class="row"><div><h2>${admin ? "Crew assignments" : "My assignments"}</h2><p class="sub">Crew projects are separate from maintenance requests and watch scheduling.</p></div>${admin ? '<button class="btn primary" data-crew="new">+ Assign project</button>' : ""}</div>
+  ${admin ? '<p class="sub">Supervisor view · all projects, including work awaiting approval.</p>' : '<p class="sub">Only projects assigned to you appear here. Submit completed work for supervisor approval.</p>'}
+  <div class="stack">${sorted.length ? sorted.map(a => {
+    const mine = (a.assignees || []).includes(D.me.id), canWork = a.status !== "Approved" && a.status !== "Pending approval";
+    const activity = (D.crewActivity || []).filter(x => x.assignmentId === a.id).slice(-5).reverse();
+    return `<div class="panel" data-crew-id="${esc(a.id)}">
+      <div class="row"><h3>${esc(a.title)}</h3><span class="chip ${a.status === "Approved" ? "ok" : a.status === "Returned" ? "warn" : ""}">${esc(a.status)}</span></div>
+      <div class="why">${esc(a.location || "No location")} · ${esc(a.priority)}${a.dueDate ? " · Due " + esc(a.dueDate) : ""}</div>
+      <p>${esc(a.description || "No description provided.")}</p>
+      <div class="why"><b>Assigned:</b> ${(a.assignees || []).map(crewName).map(esc).join(", ")}</div>
+      ${a.returnNote ? '<p class="chip warn">Supervisor feedback: ' + esc(a.returnNote) + '</p>' : ""}
+      ${a.submittedAt ? '<div class="why">Submitted by ' + esc(crewName(a.submittedBy)) + ' · ' + esc(a.submittedAt.slice(0,16).replace("T"," ")) + '</div>' : ""}
+      ${a.approvedAt ? '<div class="why">Approved by ' + esc(crewName(a.approvedBy)) + '</div>' : ""}
+      <div class="row" style="justify-content:flex-start">
+        ${canWork && (mine || admin) ? '<button class="btn small" data-crew="progress">Add progress</button><button class="btn small primary" data-crew="submit">Submit for approval</button>' : ""}
+        ${admin && a.status === "Pending approval" ? '<button class="btn small primary" data-crew="approve">Approve</button><button class="btn small" data-crew="return">Return for corrections</button>' : ""}
+        ${admin && a.status !== "Approved" ? '<button class="btn small" data-crew="edit">Edit / reassign</button>' : ""}
+      </div>
+      ${activity.length ? '<details><summary class="why">Recent activity</summary><ul class="list">' + activity.map(x => '<li><span>' + esc(x.action) + ' · ' + esc(crewName(x.personId)) + (x.note ? ': ' + esc(x.note) : '') + '</span><span class="mono">' + esc((x.timestamp || "").slice(0,16).replace("T"," ")) + '</span></li>').join("") + '</ul></details>' : ""}
+    </div>`;
+  }).join("") : '<div class="empty">No crew assignments yet.</div>'}</div>`;
+}
+function crewForm(a) {
+  const people = D.people.filter(p => p.active !== false);
+  openModal(a ? "Edit crew assignment" : "New crew assignment", "Assign one or more people. Crew work is separate from maintenance contractors.",
+    `<div class="form"><label class="full">Project title<input id="crewTitle" value="${esc(a ? a.title : "")}" placeholder="Paint corridor wall"></label>
+    <label class="full">Description<textarea id="crewDesc">${esc(a ? a.description : "")}</textarea></label>
+    <label>Location<input id="crewLoc" value="${esc(a ? a.location : "")}"></label>
+    <label>Due date<input id="crewDue" type="date" value="${esc(a ? a.dueDate : "")}"></label>
+    <label>Priority<select id="crewPri">${["Routine","Urgent","Emergency"].map(p => '<option ' + ((a ? a.priority : "Routine") === p ? 'selected' : '') + '>' + p + '</option>').join("")}</select></label>
+    <div class="full"><b>Assign crew</b><div class="stack">${people.map(p => '<label class="inline"><input type="checkbox" data-crew-person="' + esc(p.id) + '" ' + (a && (a.assignees || []).includes(p.id) ? 'checked' : '') + '> ' + esc(p.name) + '</label>').join("")}</div></div></div>`,
+    '<button class="btn" data-act="cancel">Cancel</button><button class="btn primary" id="crewSave">Save assignment</button>');
+  $("crewSave").onclick = async () => {
+    const payload = { title:$("crewTitle").value.trim(), description:$("crewDesc").value, location:$("crewLoc").value, dueDate:$("crewDue").value,
+      priority:$("crewPri").value, assignees:[...$("dlgBody").querySelectorAll("[data-crew-person]:checked")].map(e=>e.dataset.crewPerson) };
+    if (!payload.title || !payload.assignees.length) { toast("Enter a title and choose at least one crew member.", "err"); return; }
+    if (a) payload.id = a.id;
+    const result = await act(() => API.call(a ? "crew.update" : "crew.create", payload), "Assignment saved");
+    if (result) { closeModal(); await loadWeek(); }
+  };
+}
+$("s-crew").addEventListener("click", async e => {
+  const btn = e.target.closest("[data-crew]"); if (!btn) return;
+  const action = btn.dataset.crew, id = btn.closest("[data-crew-id]")?.dataset.crewId;
+  const a = (D.crewAssignments || []).find(x => x.id === id);
+  if (action === "new" || action === "edit") { crewForm(action === "edit" ? a : null); return; }
+  if (!a) return;
+  if (action === "progress" || action === "submit" || action === "return") {
+    const note = prompt(action === "progress" ? "Progress update:" : action === "return" ? "What needs correction?" : "Completion notes for supervisor (optional):");
+    if (note === null || (action !== "submit" && !note.trim())) return;
+    const op = action === "return" ? "crew.review" : action === "submit" ? "crew.submit" : "crew.progress";
+    const payload = action === "return" ? {id,decision:"return",note} : {id,note};
+    if (await act(() => API.call(op,payload), action === "submit" ? "Sent to supervisor" : "Updated")) await loadWeek();
+  }
+  if (action === "approve" && confirm("Approve and close this crew assignment?")) {
+    if (await act(() => API.call("crew.review",{id,decision:"approve"}),"Assignment approved")) await loadWeek();
+  }
+});
 
 /* ---------- Service requests ---------- */
 function newReqModal() {
