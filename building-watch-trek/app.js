@@ -178,7 +178,13 @@ function seed() {
     L(2, "Geordi La Forge", "Jupiter Station Repair Team", requests[2].id, "Repair plasma couplers, Transporter Room 3", 600, 840, "Partly", "Two fixtures need new housings", addDays(t, 0), "Exit sign out by stairwell B", "Data"),
     L(1, "B'Elanna Torres", "Shuttle Operations", "", "Inspect roof drains", 480, 570, "Yes", "", "", "Roof drain by loading dock clogged with leaves", "Nyota Uhura"),
     L(0, "Miles O'Brien", "Starfleet Engineering", requests[1].id, "Install new thermostat, Engineering Deck", 480, "", "", "", "", "", "Worf")];
-  return Core.ensure({ people, avail, watches, requests, log, audit: [],
+  const crewAssignments = [
+    {id:"CA-001",title:"Repaint observation lounge wall",description:"Prepare, prime, and repaint the damaged wall.",location:"Observation Lounge",priority:"Routine",dueDate:wk[3],assignees:[id("Worf"),id("Data")],status:"In progress",createdBy:id("Jean-Luc Picard"),createdAt:now,submittedBy:"",submittedAt:"",approvedBy:"",approvedAt:"",returnNote:"",updatedAt:now},
+    {id:"CA-002",title:"Hang framed ship photographs",description:"Level and mount the framed photographs along the corridor.",location:"Deck 3 Corridor",priority:"Routine",dueDate:wk[4],assignees:[id("Data"),id("Nyota Uhura")],status:"Assigned",createdBy:id("Jean-Luc Picard"),createdAt:now,submittedBy:"",submittedAt:"",approvedBy:"",approvedAt:"",returnNote:"",updatedAt:now},
+    {id:"CA-003",title:"Replace ceiling panels",description:"Replace stained panels and confirm the area is clean.",location:"Briefing Room",priority:"Urgent",dueDate:wk[2],assignees:[id("Worf"),id("Kira Nerys")],status:"Pending approval",createdBy:id("William Riker"),createdAt:now,submittedBy:id("Worf"),submittedAt:now,approvedBy:"",approvedAt:"",returnNote:"",updatedAt:now}
+  ];
+  const crewActivity = [{eventId:"CA-E01",assignmentId:"CA-003",personId:id("Worf"),action:"Submitted",note:"All ceiling panels replaced; ready for inspection.",timestamp:now}];
+  return Core.ensure({ people, avail, watches, requests, log, crewAssignments, crewActivity, audit: [],
     settings: { calId: "", calName: "Enterprise Crew Calendar", invites: true, remind: 30, manager: id("William Riker"), acting: { pid: "", from: "", to: "" }, tmpl: T.slice(), appUrl: location.href.split("?")[0], mailLog: [] } });
 }
 
@@ -342,12 +348,6 @@ function drawWeek() {
       </div>`;
   }).join("") : "<div class='empty'>No watches this week.</div>";
 }
-$("myWatches").addEventListener("change", e => {
-  const c = e.target; if (!c.dataset.w) return;
-  const w = D.watches.find(x => x.id === c.dataset.w); if (c.checked) w.checks[c.dataset.t] = 1; else delete w.checks[c.dataset.t];
-  drawWeek();
-  act(() => API.call("check", { wid: c.dataset.w, item: c.dataset.t, on: c.checked }));
-});
 let painting = null; const pg = $("paintGrid");
 const cellAt = e => { const el = document.elementFromPoint(e.clientX, e.clientY); return el && el.closest ? el.closest("#paintGrid td[data-k]") : null; };
 function apply(el) { if (!el) return; const [date, i] = el.dataset.k.split("|"); myDays[date][+i] = painting === "add" ? "1" : "0"; el.classList.toggle("on", painting === "add"); dirty = true; }
