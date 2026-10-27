@@ -1,0 +1,19 @@
+{
+  "name": "Building Watch — Star Trek Test",
+  "short_name": "Building Watch",
+  "description": "Fictional-data testing of scheduling, task tracking and worker logs.",
+  "id": "./",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101e2c",
+  "theme_color": "#122538",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
