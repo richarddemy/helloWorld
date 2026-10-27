@@ -143,6 +143,20 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
 .gate .panel{gap:16px}
 .demo{background:var(--accent);color:var(--accent-ink);border-radius:8px;padding:8px 12px;font-size:.84rem;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
 .demo .seg{border-color:transparent}
+/* Full-screen loading interlock. Visible until the requested data and calendar overlays finish. */
+.starfleet-loading{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:24px;background:rgba(7,16,31,.96);color:#f5e8ce;touch-action:none}
+.starfleet-console{width:min(100%,460px);padding:26px;border-radius:22px 22px 38px 12px;background:#16263d;border:2px solid #e5a86a;box-shadow:0 0 0 6px #101b2d,0 20px 80px #0009;text-align:center}
+.starfleet-kicker,.starfleet-foot{font:600 .7rem/1.5 var(--f-mono);letter-spacing:.1em;color:#e8a96a}
+.starfleet-bars{display:flex;gap:7px;margin:18px 0}.starfleet-bars span{height:13px;flex:1;border-radius:12px;background:#db9870}.starfleet-bars span:nth-child(2){background:#b7a2d7;flex:2}.starfleet-bars span:nth-child(3){background:#e7bd70;flex:3}.starfleet-bars span:nth-child(4){background:#a8bfe2}.starfleet-bars span:nth-child(5){background:#db9870;flex:.5}
+.starfleet-signal{position:relative;width:120px;height:120px;margin:16px auto;border-radius:50%;border:2px solid #8bb5d5;background:repeating-radial-gradient(circle,#172b42 0 18px,#44637d 19px 20px);overflow:hidden}
+.starfleet-sweep{position:absolute;inset:0;background:conic-gradient(from 0deg,transparent 0 280deg,#6fd1c4a0 355deg,transparent);animation:starfleet-scan 2.4s linear infinite}
+.starfleet-center{position:absolute;inset:0;display:grid;place-items:center;color:#f6c57a;font-size:28px}
+.starfleet-console h2{font-size:1.45rem;color:#fff;margin:8px 0}
+.starfleet-console p{min-height:3em;margin:12px 0 18px;color:#d8e8f4}
+.starfleet-meter{height:8px;border-radius:20px;overflow:hidden;background:#354a61}.starfleet-meter span{display:block;height:100%;width:32%;border-radius:20px;background:#e6b374;animation:starfleet-progress 2s ease-in-out infinite alternate}
+.starfleet-foot{margin-top:18px;color:#aabed1}
+@keyframes starfleet-scan{to{transform:rotate(360deg)}}@keyframes starfleet-progress{from{transform:translateX(-100%)}to{transform:translateX(310%)}}
+@media(prefers-reduced-motion:reduce){.starfleet-sweep,.starfleet-meter span{animation:none}}
 </style>
 </head>
 <body>
@@ -268,6 +282,18 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
 
   <section id="s-admin" class="stack"></section>
   <section id="s-mine" class="cols2"></section>
+</div>
+
+<div id="starfleetLoading" class="starfleet-loading" role="dialog" aria-modal="true" aria-labelledby="starfleetLoadTitle" aria-describedby="starfleetLoadText" hidden>
+  <div class="starfleet-console">
+    <div class="starfleet-kicker">STARFLEET OPERATIONS · LCARS INTERFACE</div>
+    <div class="starfleet-bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="starfleet-signal" aria-hidden="true"><div class="starfleet-sweep"></div><div class="starfleet-center">✦</div></div>
+    <h2 id="starfleetLoadTitle">Establishing subspace link</h2>
+    <p id="starfleetLoadText" role="status" aria-live="polite">Opening a channel to Starbase 001…</p>
+    <div class="starfleet-meter" aria-hidden="true"><span></span></div>
+    <div class="starfleet-foot">PLEASE STAND BY · TRANSMISSION IN PROGRESS</div>
+  </div>
 </div>
 
 <div class="toast" id="toast" hidden role="status"></div>
