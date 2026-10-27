@@ -22,16 +22,14 @@ The Star Trek demo uses fictional records and is not approved for operational Na
 
 ## Google Sheets used by the test
 
-The deployed Star Trek test uses **five Google Sheets** as its data store. Their actual links are intentionally **not published in this public repository**: sheet IDs identify live resources, and access is controlled separately by Google Drive sharing permissions.
+These are the five fictional-data Google Sheets. Links are public in this README, **but the Sheets remain private** unless the owner grants access. Reviewers can request Viewer permission; do not change sharing to Anyone with the link.
 
-For authorized IT reviewers, provide the five sheet URLs through an approved private channel, with Viewer access to fictional test data only. Do not grant Editor access or share live operational records. A link alone does not grant access to a private Sheet.
+- [01 Availability — Star Trek Demo](https://docs.google.com/spreadsheets/d/1KJk8VWF2sgV4iMXSXTfp2LCgVg4Ad0aOIEOU8KqIax8/edit)
+- [02 Watch Schedule — Star Trek Demo](https://docs.google.com/spreadsheets/d/14YYqw5W8HIg-KCr9mxIWq3FIqPpEXqLsIj74-ioizbQ/edit)
+- [03 Maintenance Workers — Star Trek Demo](https://docs.google.com/spreadsheets/d/12PM8tTBRM3vJs-jb__-Q2_HDboYm_Vs2e86tcERZC8s/edit)
+- [04 Task Definitions — Star Trek Demo](https://docs.google.com/spreadsheets/d/1uYn00bp1XhtO-iv5rrjSUKxFBwSwtSO8TAt6e9dU9pM/edit)
+- [05 Task Activity — Star Trek Demo](https://docs.google.com/spreadsheets/d/12BGPkVsYDbgvPJiRAWNVkpKEkCvM8U7An4heEJ1r8QM/edit)
 
-| Test Sheet | Review link |
-| --- | --- |
-| Sheet 1 | Share privately with authorized reviewer |
-| Sheet 2 | Share privately with authorized reviewer |
-| Sheet 3 | Share privately with authorized reviewer |
-| Sheet 4 | Share privately with authorized reviewer |
-| Sheet 5 | Share privately with authorized reviewer |
+[Google Drive folder containing all five Sheets](https://drive.google.com/drive/folders/1TDQyWmBbe-9Wk_dZ6DFQFcZcad5hw-C-)
 
 The reviewer should compare the actual Sheet schema against the deployed Apps Script configuration once its source has been exported.
