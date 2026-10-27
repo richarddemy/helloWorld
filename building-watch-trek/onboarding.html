@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Building Watch Onboarding</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column; three flowcharts, each followed by its step list; a setup checklist at the end */
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --ink:#15212f; --muted:#5b6878; --line:#d8dee6;
+  --accent:#b8862b; --navy:#1f3a5c; --chief:#2f6fae; --rich:#b8862b; --sailor:#2e7d4f;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e151e; --surface:#16202c; --ink:#e6ecf3; --muted:#93a1b2; --line:#2a3646;
+  --accent:#d6a64a; --navy:#9cc0e8; --chief:#5b9be0; --rich:#d6a64a; --sailor:#5cc08a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e151e; --surface:#16202c; --ink:#e6ecf3; --muted:#93a1b2; --line:#2a3646;
+  --accent:#d6a64a; --navy:#9cc0e8; --chief:#5b9be0; --rich:#d6a64a; --sailor:#5cc08a; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
+main{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1{font-family:var(--f-display);font-weight:700;font-size:2.3rem;line-height:1.1;margin:0;text-wrap:balance}
+h2{font-family:var(--f-display);font-weight:700;font-size:1.45rem;margin:0;text-wrap:balance}
+h3{font-family:var(--f-display);font-weight:700;font-size:1.05rem;margin:0}
+p{margin:0;max-width:68ch}
+.eyebrow{font-family:var(--f-mono);font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.lede{color:var(--muted);font-size:1.05rem}
+.owners{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:700px){.owners{grid-template-columns:1fr}}
+.owner{background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--c);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.owner p{font-size:.9rem;color:var(--muted)}
+section{display:flex;flex-direction:column;gap:14px}
+.chart{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto}
+.chart pre{margin:0;font-family:var(--f-mono);font-size:.8rem;color:var(--muted);white-space:pre}
+ol.steps{margin:0;padding:0;list-style:none;counter-reset:s;display:flex;flex-direction:column;gap:10px}
+ol.steps li{counter-increment:s;display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;align-items:start}
+ol.steps li::before{content:counter(s);font:700 .9rem var(--f-mono);width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--c,var(--navy));color:var(--bg)}
+ol.steps b{font-weight:600}
+.who{font:500 .7rem var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--c)}
+.values{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.values label{display:flex;gap:10px;align-items:flex-start;font-size:.95rem}
+.values input{accent-color:var(--accent);margin-top:5px}
+code{font-family:var(--f-mono);font-size:.86em;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.note{font-size:.9rem;color:var(--muted);border-left:3px solid var(--accent);padding:6px 12px;background:var(--surface)}
+a{color:var(--chief)}
+</style>
+</head>
+<body>
+<main>
+  <header style="display:flex;flex-direction:column;gap:10px">
+    <div class="eyebrow">Facilities · Setup and onboarding</div>
+    <h1>Building Watch Onboarding</h1>
+    <p class="lede">How the app gets set up once, how each sailor gets in, and what a normal week looks like. The full click-by-click guide is in SETUP.md next to the app.</p>
+  </header>
+
+  <div class="owners">
+    <div class="owner" style="--c:var(--chief)"><span class="who">Senior Chief</span><h3>Owns the data</h3><p>The Google Sheet and the main calendar live in his account and are shared with Richard.</p></div>
+    <div class="owner" style="--c:var(--rich)"><span class="who">MU1 Demy</span><h3>Runs the app</h3><p>The Apps Script, the Google sign-in client and the GitHub page. Email and invitations go out from his Gmail.</p></div>
+    <div class="owner" style="--c:var(--sailor)"><span class="who">Admins</span><h3>Run the shop</h3><p>Add people, set roles, assign watches, name an acting manager, email the shop. Richard and Senior Chief to start.</p></div>
+  </div>
+
+  <section>
+    <h2>1. One-time setup</h2>
+    <p>About 45 minutes total, most of it Richard's. Do these in order.</p>
+    <div class="chart"><pre class="mermaid">
+flowchart TD
+  subgraph SC[Senior Chief]
+    A1[Create Sheet: Building Watch Data] --> A2[Share Sheet with Richard as Editor]
+    A3[Create calendar: Facilities, In the Building] --> A4[Share with Richard: Make changes and manage sharing]
+  end
+  subgraph RD[Richard]
+    B1[Google Cloud: create sign-in client, publish app] --> B2[Apps Script: paste 3 files, fill SETUP]
+    B2 --> B3[Run setup and approve permissions]
+    B3 --> B4[Deploy as web app: Me, Anyone]
+    B4 --> B5[config.js: script URL and client ID]
+    B5 --> B6[GitHub Pages on]
+  end
+  A2 --> B2
+  A4 --> B2
+  B6 --> C1[Richard signs in, Test connection]
+  C1 --> C2[Add Senior Chief as Admin and Building manager]
+  C2 --> C3[Add sailors with invitations]
+</pre></div>
+    <ol class="steps">
+      <li style="--c:var(--chief)"><div><span class="who">Senior Chief</span><br><b>Make the Sheet and the calendar</b> and share both with Richard. Send him the Sheet address and the Calendar ID.</div></li>
+      <li style="--c:var(--rich)"><div><span class="who">Richard</span><br><b>Create the Google sign-in client</b> in Google Cloud. Publish it to production so any Google account can sign in. Copy the Client ID.</div></li>
+      <li style="--c:var(--rich)"><div><span class="who">Richard</span><br><b>Paste the script</b> (Code.gs, Core.gs, appsscript.json), fill in the four SETUP values, run <code>setup</code>, approve the permission screens.</div></li>
+      <li style="--c:var(--rich)"><div><span class="who">Richard</span><br><b>Deploy as a web app</b>: execute as Me, access Anyone. Copy the URL ending in <code>/exec</code>.</div></li>
+      <li style="--c:var(--rich)"><div><span class="who">Richard</span><br><b>Fill in config.js on GitHub</b> with the script URL and Client ID, then turn on GitHub Pages.</div></li>
+      <li style="--c:var(--rich)"><div><span class="who">Richard</span><br><b>Sign in and test.</b> Admin, Data storage, Test connection should show Senior Chief's Sheet and calendar.</div></li>
+      <li style="--c:var(--sailor)"><div><span class="who">Admin</span><br><b>Add Senior Chief as Admin</b> and set him as Building manager. Then add the sailors.</div></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>2. Getting a sailor in</h2>
+    <p>Only emails an admin adds can sign in. Nobody types a password into the app; Google handles that.</p>
+    <div class="chart"><pre class="mermaid">
+flowchart TD
+  A[Admin adds sailor's Google email in People and roles] --> B[App shares the main calendar with them]
+  B --> C[App emails the invitation link]
+  C --> D[Sailor opens link and signs in with Google]
+  D --> E{Is that exact email on the list?}
+  E -- No --> F[No access screen shows the account used]
+  F --> G[Admin fixes the email, or sailor switches accounts]
+  G --> D
+  E -- Yes --> H[Sailor enters rank, name, phone]
+  H --> I[Paints time on My week and saves]
+  I --> J[Optional: adds own calendar in My settings]
+  J --> K[Optional: adds Google account to iPhone Calendar]
+</pre></div>
+    <ol class="steps">
+      <li style="--c:var(--sailor)"><div><b>Admin adds the email.</b> Use the address the sailor will sign in with. A Gmail is easiest. Anyone can turn an existing email into a Google account at accounts.google.com/signup without getting a new inbox.</div></li>
+      <li style="--c:var(--sailor)"><div><b>Sailor signs in from the email.</b> If it says "no access," the screen shows which account they used. Match it in People and roles.</div></li>
+      <li style="--c:var(--sailor)"><div><b>Profile, then paint.</b> Rank and name, phone, then drag over the times they'll be in the building and press Save.</div></li>
+      <li style="--c:var(--sailor)"><div><b>Own calendar (optional).</b> In My settings, paste the secret iCal link from Google, iPhone or Outlook so their existing events show as striped blocks while they paint. Only they see the titles.</div></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>3. A normal week</h2>
+    <div class="chart"><pre class="mermaid">
+flowchart TD
+  A[Admin emails the shop: enter next week's time] --> B[Sailors paint their time and save]
+  B --> C[Main calendar fills with In bldg blocks]
+  C --> D[Admin opens Watch bill, drags to assign standers]
+  D --> E[Each stander gets a private calendar invitation]
+  E --> F[On watch: check off duties]
+  F --> G[Log maintenance workers in and out]
+  G --> H{Finished? Follow-up? New problems?}
+  H -- Finished --> I[Linked request closes]
+  H -- Follow-up --> J[Shows on Needs follow-up]
+  H -- New problem --> K[New service request opens]
+  I --> L[Reports: pick dates, download]
+  J --> L
+  K --> L
+</pre></div>
+    <p class="note">When Senior Chief is away, any admin names an acting manager with dates in Admin, Who's in charge. The acting manager gets admin rights for exactly those dates.</p>
+  </section>
+
+  <section>
+    <h2>Values to collect before Richard starts</h2>
+    <div class="values">
+      <label><input type="checkbox" id="v1"> <span><b>Sheet address</b> from Senior Chief. Goes in SETUP.SHEET.</span></label>
+      <label><input type="checkbox" id="v2"> <span><b>Calendar ID</b> from Senior Chief, ends in <code>@group.calendar.google.com</code>. Goes in SETUP.CALENDAR.</span></label>
+      <label><input type="checkbox" id="v3"> <span><b>Client ID</b> from Google Cloud, ends in <code>.apps.googleusercontent.com</code>. Goes in SETUP.CLIENT_ID and config.js.</span></label>
+      <label><input type="checkbox" id="v4"> <span><b>Web app URL</b> from Deploy, ends in <code>/exec</code>. Goes in config.js.</span></label>
+      <label><input type="checkbox" id="v5"> <span><b>Senior Chief's Google email</b> to add him as the second admin.</span></label>
+      <label><input type="checkbox" id="v6"> <span><b>Each sailor's Google email</b> for invitations.</span></label>
+    </div>
+  </section>
+</main>
+<script>
+document.querySelectorAll(".values input").forEach(function (c) {
+  try { c.checked = localStorage.getItem("bw-onb-" + c.id) === "1"; } catch (e) {}
+  c.addEventListener("change", function () { try { localStorage.setItem("bw-onb-" + c.id, c.checked ? "1" : "0"); } catch (e) {} });
+});
+</script>
+<!--MERMAID-->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+if (window.mermaid) {
+  var dark = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", flowchart: { curve: "basis", htmlLabels: true }, fontFamily: "IBM Plex Sans, system-ui, sans-serif" });
+}
+</script>
+<!--/MERMAID-->
+</body>
+</html>
