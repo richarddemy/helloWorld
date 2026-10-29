@@ -1,0 +1,9 @@
+{
+  "name": "building-watch/push-gateway",
+  "description": "Private HTTPS Web Push gateway for Building Watch",
+  "type": "project",
+  "require": {
+    "php": "^8.2",
+    "minishlink/web-push": "^9.0"
+  }
+}
