@@ -35,9 +35,10 @@ var TABS = {
   log:      { id: "s", date: "s", worker: "s", shop: "s", req: "s", task: "s", "in": "n", out: "n", done: "s", fu: "s", ret: "s", prob: "s", newReq: "s", by: "s", fuClosed: "b" },
   audit:    { t: "s", who: "s", action: "s", detail: "s" },
   crewAssignments: { id:"s", title:"s", description:"s", location:"s", priority:"s", dueDate:"s", assignees:"j", status:"s", createdBy:"s", createdAt:"s", submittedBy:"s", submittedAt:"s", approvedBy:"s", approvedAt:"s", returnNote:"s", updatedAt:"s" },
-  crewActivity: { eventId:"s", assignmentId:"s", personId:"s", action:"s", note:"s", timestamp:"s" }
+  crewActivity: { eventId:"s", assignmentId:"s", personId:"s", action:"s", note:"s", timestamp:"s" },
+  assistanceAlerts: { id:"s", createdAt:"s", location:"s", message:"s", worker:"s", recipientIds:"j", status:"s", acknowledgedBy:"s", acknowledgedAt:"s" }
 };
-var TAB_NAMES = { people: "People", avail: "Availability", watches: "Watches", requests: "Requests", log: "Maintenance Log", audit: "Audit", settings: "Settings", crewAssignments:"Crew Assignments", crewActivity:"Crew Assignment Activity" };
+var TAB_NAMES = { people: "People", avail: "Availability", watches: "Watches", requests: "Requests", log: "Maintenance Log", audit: "Audit", settings: "Settings", crewAssignments:"Crew Assignments", crewActivity:"Crew Assignment Activity", assistanceAlerts:"Assistance Alerts" };
 
 function props_() { return PropertiesService.getScriptProperties(); }
 function tz_() { return Session.getScriptTimeZone() || "America/New_York"; }
