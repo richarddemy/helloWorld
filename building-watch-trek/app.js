@@ -111,6 +111,23 @@ const Demo = {
   async call(action, payload) {
     if (!this.st) this.load();
     await new Promise(r => setTimeout(r, 120));
+    if (action.startsWith("assist.")) {
+      const st=this.st, me=Core.findEmail(st,this.emails[this.as]);
+      st.assistAlerts=st.assistAlerts||[];
+      const now=new Date(), day=iso(now), slot=Math.floor((now.getHours()*60+now.getMinutes()-START)/30);
+      const scheduled=[...new Set(st.watches.filter(w=>w.date===day && w.s<=slot && w.e>slot).map(w=>w.pid))];
+      const fallback=(st.settings.acting||{}).pid || st.settings.manager;
+      const assigned=scheduled.length ? scheduled : fallback ? [fallback] : [];
+      if(action==="assist.status")return {recipients:assigned.map(id=>({id,name:(st.people.find(p=>p.id===id)||{}).name||"Staff",subscribed:false})),myDevices:0,pushConfigured:false};
+      if(action==="assist.register"||action==="assist.unregister") return {registered:false,demo:true};
+      if(action==="assist.list") return [...st.assistAlerts].reverse().filter(a=>me.role==="Admin"||a.assignedTo.includes(me.id)).map(a=>({...a,isRecipient:a.assignedTo.includes(me.id)}));
+      if(action==="assist.create") {
+        if(!String(payload.location||"").trim()||!String(payload.message||"").trim()) throw new Error("Enter your location and what help you need.");
+        const alert={id:"demo-"+Core.uid(),createdAt:now.toISOString(),source:"Facilities team",reporter:me.name,location:String(payload.location).slice(0,140),message:String(payload.message).slice(0,750),assignedTo:assigned,status:"Open",acknowledgedBy:"",acknowledgedAt:"",pushResult:"Demo — no background push"};
+        st.assistAlerts.push(alert);this.save();return {id:alert.id,status:"Open",recipientCount:assigned.length,pushResult:alert.pushResult};
+      }
+      if(action==="assist.ack") {const a=st.assistAlerts.find(x=>x.id===payload.id);if(!a)throw new Error("Alert not found");if(!a.assignedTo.includes(me.id)&&me.role!=="Admin")throw new Error("Not authorized to acknowledge");a.status="Acknowledged";a.acknowledgedBy=me.id;a.acknowledgedAt=now.toISOString();this.save();return {id:a.id,status:a.status};}
+    }
     if (action === 'admin.test') return { demo: true };
     if (action === 'admin.calendars') return [
       { id: 'enterprise-test', name: 'USS Enterprise — Fictional Calendar', primary: false },
@@ -148,7 +165,7 @@ const DH = {
 };
 function seed() {
   const wk = week(), t = iso(new Date()), now = new Date().toISOString();
-  const P = (email, name, role, watch) => ({ id: Core.uid(), email, name, role, watch, active: true, phone: "", cals: [], invitedAt: now, joinedAt: now });
+  const P = (email, name, role, watch) => ({ id: Core.uid(), email, name, role, watch, active: true, cals: [], invitedAt: now, joinedAt: now });
   const people = [P("picard@demo.invalid", "Jean-Luc Picard", "Admin", true), P("riker@demo.invalid", "William Riker", "Admin", false), P("worf@demo.invalid", "Worf", "Member", true),
     P("data@demo.invalid", "Data", "Member", true), P("uhura@demo.invalid", "Nyota Uhura", "Member", true), P("sisko@demo.invalid", "Benjamin Sisko", "Member", true),
     P("janeway@demo.invalid", "Kathryn Janeway", "Member", true), P("kira@demo.invalid", "Kira Nerys", "Member", true), P("troi@demo.invalid", "Deanna Troi", "Member", true)];
@@ -231,11 +248,11 @@ async function afterToken() {
 function profileGate(me) {
   gate(`<h2>Welcome aboard</h2><p class="sub">You're signed in as <b>${esc(me.email)}</b>. Finish your profile to get started.</p>
     <label>Rank and name<input id="pfName" value="${esc(me.name && me.name !== me.email ? me.name : "")}" placeholder="e.g. MU2 Garcia"></label>
-    <label>Phone (for the watch roster)<input id="pfPhone" placeholder="Optional"></label>
     <button class="btn primary" id="pfGo">Continue</button>`);
-  $("pfGo").onclick = () => act(async () => { await API.call("profile.save", { name: $("pfName").value, phone: $("pfPhone").value }); boot(); });
+  $("pfGo").onclick = () => act(async () => { await API.call("profile.save", { name: $("pfName").value }); boot(); });
 }
 function signOut(msg) {
+  assistanceItems = []; assistancePending=null; D=null; $("assistanceIncoming").hidden=true;
   TOKEN = null; try { sessionStorage.removeItem("bw-token"); } catch (e) {}
   try { if (window.google && google.accounts) google.accounts.id.disableAutoSelect(); } catch (e) {}
   startAuth(msg);
@@ -248,6 +265,7 @@ async function boot() {
     $("gate").hidden = true; $("app").hidden = false;
     $("demoBar").hidden = !DEMO; $("signOut").hidden = DEMO;
     await loadWeek();
+    assistanceRefresh();
   } finally { endLoading(); }
 }
 async function loadWeek(keepTab) {
@@ -640,6 +658,111 @@ $("s-crew").addEventListener("click", async e => {
   }
 });
 
+/* ---------- Assistance requests: private facilities team inbox ---------- */
+let assistanceItems=[], assistancePending=null, assistanceSuppressed=new Set(), assistancePolling=false;
+function assistancePendingMine() {
+  return assistanceItems.filter(a => a.status==="Open" && a.isRecipient);
+}
+async function assistanceCall(action,payload={},silent=false) {
+  if(!silent) return API.call(action,payload);
+  if(DEMO) return Demo.call(action,payload);
+  const response=await fetch(CFG.SCRIPT_URL,{
+    method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify({token:TOKEN,action,payload})
+  });
+  if(!response.ok) throw new Error("Assistance connection is unavailable.");
+  const value=await response.json();
+  if(!value.ok) throw new Error(value.error || "Assistance service unavailable.");
+  return value.data;
+}
+async function assistanceRefresh() {
+  if(assistancePolling || !D || (!DEMO && !TOKEN)) return;
+  assistancePolling=true;
+  try {
+    const list=await assistanceCall("assist.list",{},true);
+    assistanceItems=Array.isArray(list)?list:[];
+    const pending=assistancePendingMine();
+    const count=$("alertsCount");if(count){count.textContent=String(pending.length);count.hidden=!pending.length;}
+    const unseen=pending.find(x=>!assistanceSuppressed.has(x.id));
+    if(unseen) assistancePresent(unseen);
+    else if(assistancePending && !pending.some(x=>x.id===assistancePending.id)) assistanceDismiss();
+  }catch(e) { /* The app stays usable during a temporary alert service outage. */ }
+  finally { assistancePolling=false; }
+}
+function assistancePresent(item) {
+  assistancePending=item;
+  $("assistDetails").textContent=item.reporter+" · "+item.location;
+  $("assistMessage").textContent=item.message;
+  $("assistanceIncoming").hidden=false;
+}
+function assistanceDismiss() {
+  $("assistanceIncoming").hidden=true;
+  assistancePending=null;
+}
+async function assistanceAck(id) {
+  const r=await act(()=>assistanceCall("assist.ack",{id}),"Assistance acknowledged");
+  if(r) {assistanceDismiss();await assistanceRefresh();}
+}
+function assistanceCenter() {
+  const list=assistanceItems;
+  openModal("Assistance alerts", "Only the assigned watch and building managers can review these requests.",
+    list.length ? '<ul class="list">'+list.map(a=>'<li><div class="item"><b>'+esc(a.reporter)+" · "+esc(a.location)+'</b><span>'+esc(a.message)+'</span><span class="why">'+esc(a.source)+" · "+esc(a.createdAt.replace("T"," ").slice(0,16))+'</span><span class="chip">'+esc(a.status)+'</span></div>'+(a.status==="Open"&&(a.isRecipient||D.admin)?'<button class="btn small primary" data-assist-ack="'+esc(a.id)+'">Acknowledge</button>':"")+'</li>').join("")+'</ul>' : "<p>No assistance alerts yet.</p>",
+    '<button class="btn" data-act="cancel">Close</button>');
+}
+function assistanceRequestForm() {
+  openModal("Request assistance", "The current watchstander, or acting building manager, will receive this request. No phone numbers are shared.",
+    '<div class="form"><label class="full">Where are you?<input id="assistanceLocation" maxlength="140" required placeholder="Deck, room, entrance, or work area"></label><label class="full">What help do you need?<textarea id="assistanceMessage" maxlength="750" required placeholder="Describe the situation and assistance you need"></textarea></label></div><p class="why">For immediate emergencies, follow established emergency procedures.</p>',
+    '<button class="btn" data-act="cancel">Cancel</button><button class="btn primary" id="assistanceSend">Send alert</button>');
+}
+$("quickAssist").onclick=assistanceRequestForm;
+$("alertsOpen").onclick=async()=>{await assistanceRefresh();assistanceCenter();};
+$("assistLater").onclick=()=>{if(assistancePending)assistanceSuppressed.add(assistancePending.id);assistanceDismiss();};
+$("assistAcknowledge").onclick=()=>assistancePending&&assistanceAck(assistancePending.id);
+$("assistViewAll").onclick=()=>{assistanceDismiss();assistanceCenter();};
+$("dlgBody").addEventListener("click",e=>{
+  const button=e.target.closest("[data-assist-ack]");if(button) assistanceAck(button.dataset.assistAck);
+});
+$("dlgAct").addEventListener("click",async e=>{
+  if(e.target.id!=="assistanceSend")return;
+  const location=$("assistanceLocation").value.trim(), message=$("assistanceMessage").value.trim();
+  if(!location||!message){toast("Enter your location and message first.","err");return;}
+  const r=await act(()=>assistanceCall("assist.create",{location,message}),
+    x=>x.recipientCount ? "Assistance request recorded and routed to the on-watch team." : "Request saved, but no on-watch recipient is assigned.");
+  if(r){closeModal();await assistanceRefresh();}
+});
+function assistanceVapidBytes(key) {
+  const str=atob(key.replace(/-/g,"+").replace(/_/g,"/")+"=".repeat((4-key.length%4)%4));
+  return Uint8Array.from(str,c=>c.charCodeAt(0));
+}
+async function assistanceEnablePush() {
+  if(DEMO){toast("The browser demo cannot send real background push; sign into the live app.","err");return;}
+  if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window)){toast("This browser does not support Web Push.","err");return;}
+  if(!/^[A-Za-z0-9_-]{80,100}$/.test(CFG.PUSH_PUBLIC_KEY||"")){toast("The Web Push public key has not been configured yet.","err");return;}
+  try{
+    const permission=await Notification.requestPermission();
+    if(permission!=="granted"){toast("Allow notifications in your device settings to receive alerts.","err");return;}
+    const registration=await navigator.serviceWorker.register("./sw.js");
+    const current=await registration.pushManager.getSubscription();
+    const subscription=current||await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:assistanceVapidBytes(CFG.PUSH_PUBLIC_KEY)});
+    const result=await assistanceCall("assist.register",{subscription:subscription.toJSON()});
+    if(result.registered)toast("Background push alerts are enabled for this device.");
+  }catch(e){toast("Could not enable push: "+(e.message||e),"err");}
+}
+async function assistanceDisablePush() {
+  try {
+    const registration=await navigator.serviceWorker.ready,subscription=await registration.pushManager.getSubscription();
+    if(!subscription){toast("No push subscription on this device.");return;}
+    await assistanceCall("assist.unregister",{endpoint:subscription.endpoint});
+    await subscription.unsubscribe();toast("Push alerts disabled on this device.");
+  }catch(e){toast("Could not disable push: "+(e.message||e),"err");}
+}
+$("s-mine").addEventListener("click",e=>{
+  if(e.target.id==="enableAssistancePush")assistanceEnablePush();
+  if(e.target.id==="disableAssistancePush")assistanceDisablePush();
+});
+setInterval(()=>{if(D)assistanceRefresh();},25000);
+window.addEventListener("focus",()=>{if(D)assistanceRefresh();});
+
 /* ---------- Service requests ---------- */
 function newReqModal() {
   openModal("New service request", "", `<div class="form"><label class="full">Location<input id="rqLoc" placeholder="Deck, room, or area"></label>
@@ -727,8 +850,12 @@ function drawMine() {
     ${D.settings.calId ? `<label>Open in Google Calendar${copyBox("subG", subLink())}</label>` : `<div class="why">An admin hasn't set the main calendar yet.</div>`}
     <div class="why"><b>iPhone:</b> Settings, Calendar, Accounts, Add Account, Google, sign in with ${esc(me.email)}. Then on a computer open calendar.google.com/calendar/syncselect and tick ${esc(D.settings.calName)} so it shows on the phone.</div>
     <div class="why">Your own watches also arrive as calendar invitations${D.settings.invites ? "" : " (turned off by an admin)"}.</div></div>
-  <div class="panel"><h2>My profile</h2><div class="sub" style="margin-top:-8px">Signed in as ${esc(me.email)}</div>
-    <label>Rank and name<input id="myName" value="${esc(me.name)}"></label><label>Phone<input id="myPhone" value="${esc(me.phone)}"></label>
+  <div class="panel"><h2>Assistance notifications</h2>
+  <p class="sub">Enable secure background push alerts on this device, without sharing your telephone number. Notifications are routed from the current watch schedule.</p>
+  <div class="row start"><button class="btn primary" id="enableAssistancePush">Enable Push Notifications</button><button class="btn" id="disableAssistancePush">Disable Push</button></div>
+  <p class="why">On supported iPhones, first add this web app to the Home Screen, then open it there to enable notifications. Your device must grant notification permission.</p>
+  </div><div class="panel"><h2>My profile</h2><div class="sub" style="margin-top:-8px">Signed in as ${esc(me.email)}</div>
+    <label>Rank and name<input id="myName" value="${esc(me.name)}"></label>
     <button class="btn small primary" id="mySave" style="align-self:flex-start">Save profile</button></div></div>`;
 }
 async function saveCals(cals, msg) { const r = await act(() => API.call("cals.save", { cals }), msg); if (r) { D.me.cals = r; drawMine(); busy = []; if (r.some(c => c.on)) API.call("busy", { week: week() }).then(b => busy = b || []).catch(() => {}); } }
@@ -736,7 +863,7 @@ $("s-mine").addEventListener("click", async e => {
   const t = e.target, cals = (D.me.cals || []).slice();
   if (t.id === "mcAdd") { const url = $("mcUrl").value.trim(); if (!url) { $("mcUrl").focus(); toast("Paste the calendar address", "err"); return; } cals.push({ label: $("mcLabel").value.trim() || "My calendar", url, on: true }); saveCals(cals, "Calendar added"); }
   if (t.dataset.mdel != null) { cals.splice(+t.dataset.mdel, 1); saveCals(cals, "Calendar removed"); }
-  if (t.id === "mySave") { const r = await act(() => API.call("profile.save", { name: $("myName").value, phone: $("myPhone").value }), "Profile saved"); if (r) { Object.assign(D.me, r); render(); } }
+  if (t.id === "mySave") { const r = await act(() => API.call("profile.save", { name: $("myName").value }), "Profile saved"); if (r) { Object.assign(D.me, r); render(); } }
 });
 $("s-mine").addEventListener("change", e => { const k = e.target.dataset.mcal; if (k != null) { const cals = D.me.cals.slice(); cals[+k] = Object.assign({}, cals[+k], { on: e.target.checked }); saveCals(cals, e.target.checked ? "Calendar shown" : "Calendar hidden"); } });
 
@@ -769,10 +896,12 @@ function drawAdmin() {
     <button class="btn" id="mtManual">Make a test log entry</button>
     <button class="btn" id="mtLog">Check maintenance log</button>
   </div>
-  <label>Watch telephone (for the worker's email)<input id="mtWatchPhone" type="tel" value="${esc(st.watchPhone || "")}" placeholder="Set a phone number"></label>
-  <div class="row start"><button class="btn" id="mtPhoneSave">Save watch phone</button><span id="mtPhoneStatus" class="why">${st.watchPhone ? "Saved number: " + esc(st.watchPhone) : "Requires the updated backend to save and include in emails."}</span></div>
-  <p class="why">Testing: assign a current watch shift to a facilities user with a real, authorized email address. Enter a consenting real email on the Google Form and submit fictional work details. Check the Maintenance Staff log, the worker inbox, and the watchstander's inbox. The worker's email contains a one-time checkout link. A checkout triggers a separate watch alert.</p>
+  <p class="why">Testing: assign a current watch shift to a facilities user with a real, authorized email address. Enter a consenting real email on the Google Form and submit fictional work details. Check the Maintenance Staff log, the worker inbox, and the watchstander's inbox. The worker's email contains private checkout and Request Assistance buttons. Assistance alerts appear in the facilities app and are pushed to the on-watch devices when configured.</p>
   </div><div class="cols2">
+  <div class="panel"><div class="row"><h2>Assistance routing</h2><button class="btn" id="assistRoutingCheck">Check recipients</button></div>
+    <div id="assistRoutingStatus" class="why">Current watchstanders receive assistance alerts. When none are scheduled, alerts go to the acting building manager, then the building manager.</div>
+    <p class="why">Notifications do not expose staff phone numbers. To receive background push, each assigned person enables notifications on their own device.</p>
+    </div>
   <div class="panel"><h2>Who's in charge</h2>
     <label>Building manager<select id="adMgr">${opt(ppl, st.manager)}</select></label>
     <div class="why">When the manager is away, name an acting manager (CIC). They get full admin rights for those dates and show as in charge.</div>
@@ -862,6 +991,14 @@ $("s-admin").addEventListener("change", e => {
 $("s-admin").addEventListener("click", async e => {
   const t = e.target, d = t.dataset;
   if (t.id === "mtCheck") { await loadMaintenanceTest(); return; }
+  if (t.id === "assistRoutingCheck") {
+    const el = $("assistRoutingStatus"); el.textContent = "Checking routing and device subscriptions…";
+    try { const r = await API.call("assist.status");
+      el.textContent = r.recipients.length ? r.recipients.map(x => x.name+" — "+(x.subscribed ? "push enabled" : "push not enabled")).join("; ") : "No active watch or eligible building manager. Please assign a watchstander or manager.";
+      el.textContent += r.pushConfigured ? " · Push gateway configured." : " · Push gateway not configured.";
+    } catch (err) {el.textContent = "Assistance backend not ready: " + (err.message||err);}
+    return;
+  }
   if (t.id === "mtCreateForm") {
     if (!confirm("Create a public Google Form for maintenance check-in? Anyone with the form link will be able to submit a test entry. Use fictional details and consenting email addresses only.")) return;
     const result = await act(() => API.call("admin.workerFormSetup"), "Maintenance check-in Form created");
@@ -875,17 +1012,6 @@ $("s-admin").addEventListener("click", async e => {
     if (url) navigator.clipboard.writeText(url).then(() => toast("Real check-in link copied")).catch(() => toast("Select and copy the link above.", "err"));
     return;
   }
-  if (t.id === "mtPhoneSave") {
-    const value = $("mtWatchPhone").value.trim();
-    if (value && !/^\\+?[0-9().\\s-]{7,25}$/.test(value)) { toast("Enter a valid watch phone number.", "err"); return; }
-    const saved = await act(() => API.call("settings.save", { watchPhone:value }));
-    if (!saved) return;
-    if (saved.watchPhone !== value) { toast("The live backend does not support the watch phone setting yet. Update Apps Script first.", "err"); return; }
-    D.settings.watchPhone = saved.watchPhone;
-    $("mtPhoneStatus").textContent = value ? "Saved number: " + value : "No watch telephone configured.";
-    toast("Watch phone saved"); return;
-  }
-
   if (t.id === "adActSave") { await act(() => API.call("settings.save", { manager: $("adMgr").value, acting: { pid: $("adActWho").value, from: $("adActFrom").value, to: $("adActTo").value } }), "Saved"); await loadWeek(); }
   if (t.id === "adActClear") { await act(() => API.call("settings.save", { acting: { pid: "", from: "", to: "" } }), "Acting manager ended"); await loadWeek(); }
   if (t.id === 'adCalLoad') {

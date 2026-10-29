@@ -1,0 +1,28 @@
+name: Building Watch assistance review checks
+on:
+  pull_request:
+    paths:
+      - 'building-watch-trek/**'
+      - 'building-watch-backend-review/**'
+      - 'building-watch-push/**'
+      - '.github/workflows/building-watch-assistance.yml'
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse browser scripts and patcher
+        run: |
+          node --check building-watch-trek/app.js
+          node --check building-watch-trek/core.js
+          node --check building-watch-trek/sw.js
+          node --check building-watch-backend-review/scripts/apply-assistance.cjs
+      - name: Test assistance security and watch routing
+        run: node building-watch-backend-review/tests/assistance.test.cjs
+      - name: PHP Web Push gateway syntax
+        run: |
+          php -l building-watch-push/public/push.php
+          php -l building-watch-push/config.example.php
