@@ -30,7 +30,7 @@ const isOut = l => l.out !== "" && l.out != null;
 
 let weekStart = monday(new Date());
 const week = () => [0, 1, 2, 3, 4].map(i => addDays(weekStart, i));
-let D = null, tab = null, myDays = {}, dirty = false, busy = [], sel = null, chosen = new Set(), mailTo = new Set(), report = null;
+let D = null, tab = qs.get("tab") || null, myDays = {}, dirty = false, busy = [], sel = null, chosen = new Set(), mailTo = new Set(), report = null;
 
 /* ---------- small UI helpers ---------- */
 function toast(t, kind) { const e = $("toast"); e.textContent = t; e.className = "toast" + (kind === "err" ? " err" : ""); e.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => e.hidden = true, kind === "err" ? 5000 : 2600); }
@@ -551,10 +551,22 @@ async function saveWatch() {
 
 /* ---------- Maintenance log ---------- */
 const reqOf = id => D.requests.find(x => x.id === id);
+const helpAcked = l => !!(l.helpAt && l.helpAckAt && l.helpAckAt >= l.helpAt);
+// Tells the Chat space (in the same thread) and everyone in the building who is responding.
+function closeHelpCards(logId) {
+  document.querySelectorAll(".bwWatchAlert[data-kind='assistance']").forEach(c => { if (c.dataset.log === logId) c.remove(); });
+}
+async function ackHelp(id) {
+  const r = await act(() => API.call("log.ack", { id }));
+  if (!r) return false;
+  closeHelpCards(id);
+  toast(r.helpAckBy && r.helpAckBy !== D.me.name ? r.helpAckBy + " is already responding" : "You're responding. The Chat space has been told.");
+  await loadWeek(); return true;
+}
 const reqShort = id => { const r = reqOf(id); return r ? (r.wo || "Request") + " · " + r.loc : ""; };
 function drawLog() {
   const open = D.log.filter(l => !isOut(l)); $("nowCount").textContent = open.length || "";
-  $("nowList").innerHTML = open.length ? open.map(l => `<li><div class="item"><b>${esc(l.worker)}</b><span class="why">${esc(l.shop)}${l.req ? " · " + esc(reqShort(l.req)) : ""}</span><span>${esc(l.task)}</span>${l.helpAt ? `<span class="chip warn">Assistance requested</span><span><b>Location: ${esc(l.helpLocation || "Not specified")}</b> — ${esc(l.helpMessage || "I need help")}</span>` : ""}<span class="mono">In ${fmt(+l.in)}${l.date !== D.today ? " on " + md(l.date) : ""} · logged by ${esc(l.by)}</span></div><button class="btn small primary" data-co="${l.id}">Check out</button></li>`).join("") : "<li class='empty'>No workers in the building.</li>";
+  $("nowList").innerHTML = open.length ? open.map(l => `<li><div class="item"><b>${esc(l.worker)}</b><span class="why">${esc(l.shop)}${l.req ? " · " + esc(reqShort(l.req)) : ""}</span><span>${esc(l.task)}</span>${l.helpAt ? `<span class="chip warn">Assistance requested</span><span><b>Location: ${esc(l.helpLocation || "Not specified")}</b> · ${esc(l.helpMessage || "I need help")}</span>${helpAcked(l) ? `<span class="chip ok">${esc(l.helpAckBy)} is responding</span>` : `<button class="btn small primary" data-ack="${l.id}">I'm responding</button>`}` : ""}<span class="mono">In ${fmt(+l.in)}${l.date !== D.today ? " on " + md(l.date) : ""} · logged by ${esc(l.by)}</span></div><button class="btn small primary" data-co="${l.id}">Check out</button></li>`).join("") : "<li class='empty'>No workers in the building.</li>";
   const fu = followups();
   $("fuList").innerHTML = fu.length ? fu.map(l => `<li><div class="item"><b>${esc(l.task)}</b><span class="why">${esc(l.worker)}${l.shop ? ", " + esc(l.shop) : ""} · ${md(l.date)} · finished: ${esc(l.done)}</span>
     ${l.fu ? `<span>Follow-up: ${esc(l.fu)}</span>` : ""}${l.ret ? `<span class="mono">Returning ${md(l.ret)}</span>` : ""}${l.prob && !l.newReq ? `<span>New problem: ${esc(l.prob)}</span>` : ""}</div>
@@ -612,6 +624,7 @@ $("s-log").addEventListener("click", async e => {
   if (t.lg === "in") openCI();
   if (t.lg === "refresh") await loadWeek();
   if (t.co) openCO(t.co);
+  if (t.ack) await ackHelp(t.ack);
   if (t.res) { await act(() => API.call("log.resolve", { id: t.res }), "Marked resolved"); await loadWeek(); }
   if (t.mk) { await act(() => API.call("log.makeReq", { id: t.mk }), "Service request opened"); await loadWeek(); }
 });
@@ -801,6 +814,17 @@ const TEMPLATES = {
   watch: { s: "Watch bill posted", b: "Shipmates,\n\nNext week's building watch bill is posted. Check your calendar for invitations and accept them.\n{url}\n\nV/r,\n{from}" },
   custom: { s: "", b: "" } };
 const opt = (list, v) => list.map(([val, lbl]) => `<option value="${esc(val)}" ${val === v ? "selected" : ""}>${esc(lbl)}</option>`).join("");
+// Chat pager: a ping in a Google Chat space when a worker asks for help. The webhook URL is a
+// password, so it is never shown again after saving; only the space it points to is listed.
+function chatPagerPanel() {
+  const cp = D.chatPager, w = watchers(), ready = w.filter(p => p.chatReady).map(p => p.name), not = w.filter(p => !p.chatReady).map(p => p.name);
+  const status = DEMO ? "Demo mode: no Chat space is connected." : !cp ? "Requires the updated backend." : cp.configured ? `Connected to <b>${esc(cp.space)}</b>.` : "Not connected.";
+  return `<h3 style="margin-top:18px">Chat pager</h3>
+  <p class="why">When a maintenance worker requests assistance, Building Watch posts a ping in your Google Chat space and @mentions the responder, with a button to open the app. The ping never includes names or locations.</p>
+  <label>Chat space webhook URL<input id="cpUrl" type="password" autocomplete="off" spellcheck="false" placeholder="${cp && cp.configured ? "Saved. Paste a new URL to replace it." : "https://chat.googleapis.com/v1/spaces/…"}"></label>
+  <div class="row start"><button class="btn" id="cpSave">Save webhook</button><button class="btn" id="cpTest" ${cp && cp.configured ? "" : "disabled"}>Send test ping</button>${cp && cp.configured ? `<button class="btn" id="cpClear">Disconnect</button>` : ""}<span id="cpStatus" class="why">${status}</span></div>
+  <div class="why">${cp ? (ready.length ? "Can be @mentioned: " + esc(ready.join(", ")) + ". " : "") + (not.length ? "Named in plain text until they sign in once: " + esc(not.join(", ")) + "." : "") : ""}</div>`;
+}
 function drawAdmin() {
   const st = D.settings, a = st.acting || {}, active = D.people.filter(p => p.active !== false), ppl = active.map(p => [p.id, p.name]);
   $("s-admin").innerHTML = `<div class="panel" id="maintenanceTestPanel">
@@ -825,6 +849,7 @@ function drawAdmin() {
   </div>
   <label>Watch telephone (for the worker's email)<input id="mtWatchPhone" type="tel" value="${esc(st.watchPhone || "")}" placeholder="Set a phone number"></label>
   <div class="row start"><button class="btn" id="mtPhoneSave">Save watch phone</button><span id="mtPhoneStatus" class="why">${st.watchPhone ? "Saved number: " + esc(st.watchPhone) : "Requires the updated backend to save and include in emails."}</span></div>
+  ${chatPagerPanel()}
   <p class="why">Testing: assign a current watch shift to a facilities user with a real, authorized email address. Enter a consenting real email on the Google Form and submit fictional work details. Check the Maintenance Staff log, the worker inbox, and the watchstander's inbox. The worker's email contains a one-time checkout link. A checkout triggers a separate watch alert.</p>
   </div><div class="cols2">
   <div class="panel"><h2>Who's in charge</h2>
@@ -929,9 +954,26 @@ $("s-admin").addEventListener("click", async e => {
     if (url) navigator.clipboard.writeText(url).then(() => toast("Real check-in link copied")).catch(() => toast("Select and copy the link above.", "err"));
     return;
   }
+  if (t.id === "cpSave") {
+    const url = $("cpUrl").value.trim();
+    if (!/^https:\/\/chat\.googleapis\.com\/v1\/spaces\//.test(url)) { toast("Paste the webhook URL from the Chat space (it starts with https://chat.googleapis.com/v1/spaces/).", "err"); return; }
+    const r = await act(() => API.call("admin.chat.save", { url }), "Chat pager connected");
+    if (r) { D.chatPager = r; drawAdmin(); }
+    return;
+  }
+  if (t.id === "cpTest") {
+    const r = await act(() => API.call("admin.chat.test"));
+    if (r) toast(r.mentioned ? "Test ping sent. You should get an @mention." : "Test ping sent. Sign out and in once so you can be @mentioned.");
+    return;
+  }
+  if (t.id === "cpClear") {
+    const r = await act(() => API.call("admin.chat.clear"), "Chat pager disconnected");
+    if (r) { D.chatPager = r; drawAdmin(); }
+    return;
+  }
   if (t.id === "mtPhoneSave") {
     const value = $("mtWatchPhone").value.trim();
-    if (value && !/^\\+?[0-9().\\s-]{7,25}$/.test(value)) { toast("Enter a valid watch phone number.", "err"); return; }
+    if (value && !/^\+?[0-9().\s-]{7,25}$/.test(value)) { toast("Enter a valid watch phone number.", "err"); return; }
     const saved = await act(() => API.call("settings.save", { watchPhone:value }));
     if (!saved) return;
     if (saved.watchPhone !== value) { toast("The live backend does not support the watch phone setting yet. Update Apps Script first.", "err"); return; }
@@ -1074,15 +1116,18 @@ function ensureWatchAlertUI() {
 }
 function showWatchAlert(a) {
   ensureWatchAlertUI();
+  // Once someone is responding, any open request card for the same worker is out of date.
+  if (a.kind === "ack" && a.log) closeHelpCards(a.log);
   const card = document.createElement("section");
   card.className = "bwWatchAlert";
+  card.dataset.kind = a.kind || ""; card.dataset.log = a.log || "";
   card.setAttribute("role", "alert");
   const title = document.createElement("strong");
-  const titles = { assistance: "🚨 Worker needs assistance", arrival: "Maintenance worker checked in", departure: "Maintenance worker checked out" };
+  const titles = { assistance: "🚨 Worker needs assistance", arrival: "Maintenance worker checked in", departure: "Maintenance worker checked out", ack: "✅ Assistance request answered" };
   title.textContent = titles[a.kind] || "Building Watch notification";
   const body = document.createElement("div"); body.className = "bwBody";
   // Everyone in the building sees the alert; it names who is expected to respond.
-  const who = a.you ? "You are the responder" : a.responder ? "Responder: " + a.responder : "";
+  const who = a.kind === "ack" ? "" : a.ackBy ? a.ackBy + " is responding" : a.you ? "You are the responder" : a.responder ? "Responder: " + a.responder : "";
   body.textContent = [a.worker, a.shop, a.location ? "Location: " + a.location : "", a.message ? "Message: " + a.message : "", who].filter(Boolean).join("\n");
   if (a.you && a.kind === "assistance") card.style.borderWidth = "4px";
   const controls = document.createElement("div"); controls.className = "bwActions";
@@ -1092,7 +1137,14 @@ function showWatchAlert(a) {
   open.onclick = () => { card.remove(); tab = "log"; if (dirty) { render(); toast("Save My week to refresh the log.", "err"); } else loadWeek(); };
   const dismiss = document.createElement("button"); dismiss.className = "btn";
   dismiss.textContent = "Dismiss"; dismiss.onclick = () => card.remove();
-  controls.append(open, dismiss); card.append(title, body, controls);
+  controls.append(open, dismiss);
+  if (a.kind === "assistance" && !a.ackBy && a.log) {
+    // Anyone in the building can take it; the first one to press is the one who's responding.
+    const go = document.createElement("button"); go.className = "btn primary"; go.textContent = "I'm responding";
+    go.onclick = async () => { go.disabled = true; if (await ackHelp(a.log)) card.remove(); else go.disabled = false; };
+    controls.prepend(go); open.className = "btn";
+  }
+  card.append(title, body, controls);
   $("bwAlertTray").prepend(card);
   while ($("bwAlertTray").children.length > 4) $("bwAlertTray").lastElementChild.remove();
 }

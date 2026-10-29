@@ -106,6 +106,7 @@ var Core = (function () {
       o.email = p.email; o.phone = p.phone || ""; o.active = p.active !== false;
       o.invitedAt = p.invitedAt || ""; o.joinedAt = p.joinedAt || "";
       o.calCount = (p.cals || []).filter(function (c) { return c.on; }).length;
+      o.chatReady = !!p.chatId;   // can be @mentioned by the Chat pager (learned at sign-in)
     }
     return o;
   }
@@ -365,7 +366,8 @@ var Core = (function () {
           done: '', fu: '', ret: '', prob: '', newReq: '', by: nm(me), fuClosed: false,
           email: str(P.email, 120).toLowerCase(), emailConsent: !!P.emailConsent,
           tokenHash: '', tokenExpiry: '', workerOutAt: '', watchOutAt: '', watchSeenAt: '', outBy: '',
-          inAt: H.nowISO(), helpAt: '', helpLocation: '', helpMessage: '' };
+          inAt: H.nowISO(), helpAt: '', helpLocation: '', helpMessage: '',
+          helpAckBy: '', helpAckById: '', helpAckAt: '', helpAckChat: '' };
         st.log.push(l);
         if (link && (link.status === "Open" || link.status === "Submitted to PW")) { link.status = "In progress"; touch(st, "requests"); }
         touch(st, "log");
@@ -385,6 +387,17 @@ var Core = (function () {
         }
         touch(st, "log");
         return logView(l2, admin);
+      }
+      /* Someone signed in says they are responding to a worker's assistance request. */
+      case "log.ack": {
+        var la = byId(st.log, P.id);
+        if (!la) throw E("missing", "Log entry not found.");
+        if (!la.helpAt) throw E("input", "This worker hasn't asked for assistance.");
+        // Already acknowledged for this request: first responder stands, nothing changes.
+        if (la.helpAckAt && la.helpAckAt >= la.helpAt) return logView(la, admin);
+        la.helpAckBy = nm(me); la.helpAckById = me.id; la.helpAckAt = H.nowISO();
+        touch(st, "log"); audit(st, me, "log.ack", la.id, H);
+        return logView(la, admin);
       }
       case "log.resolve": {
         need();
@@ -440,6 +453,7 @@ var Core = (function () {
           if (!isEmail(ne)) throw E("input", "Enter a valid email address.");
           if (findEmail(st, ne)) throw E("input", ne + " is already used by someone else.");
           H.shareCal(st, p.email, false); p.email = ne; H.shareCal(st, ne, true);
+          p.chatId = "";  // a new address may be a different Google account; relearned at next sign-in
         }
         if (P.name !== undefined) p.name = str(P.name, 80);
         if (P.phone !== undefined) p.phone = str(P.phone, 40);
