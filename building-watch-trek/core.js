@@ -34,7 +34,7 @@ var Core = (function () {
 
   function defaults() {
     return {
-      calId: "", calName: "Building Watch", invites: true, remind: 30,
+      calId: "", calName: "Building Watch", invites: true, remind: 30, watchPhone: "",
       manager: "", acting: { pid: "", from: "", to: "" },
       tmpl: DEF_TMPL.slice(), appUrl: "", mailLog: []
     };
@@ -93,7 +93,7 @@ var Core = (function () {
   function publicSettings(st, admin) {
     var s = st.settings;
     var o = { calName: s.calName, calId: s.calId, invites: s.invites, remind: s.remind, tmpl: s.tmpl,
-      appUrl: s.appUrl, manager: s.manager, acting: s.acting };
+      appUrl: s.appUrl, manager: s.manager, acting: s.acting, watchPhone: s.watchPhone || "" };
     if (admin) o.mailLog = (s.mailLog || []).slice(-10);
     return o;
   }
@@ -444,6 +444,11 @@ var Core = (function () {
         if (P.invites !== undefined) S.invites = !!P.invites;
         if (P.remind !== undefined) S.remind = +P.remind || 0;
         if (P.appUrl !== undefined) S.appUrl = str(P.appUrl, 300);
+        if (P.watchPhone !== undefined) {
+          var phone = str(P.watchPhone, 30);
+          if (phone && !/^\+?[0-9().\s-]{7,25}$/.test(phone)) throw E("input", "Enter a valid watch telephone number.");
+          S.watchPhone = phone;
+        }
         if (P.manager !== undefined && byId(st.people, P.manager)) S.manager = P.manager;
         if (P.acting !== undefined) {
           var a = P.acting || {};
