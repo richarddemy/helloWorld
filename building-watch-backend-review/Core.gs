@@ -57,7 +57,7 @@ var Core = (function () {
   }
   function newPerson(email, name, role, nowISO) {
     return { id: uid(), email: lc(email), name: str(name, 80), role: role === "Admin" ? "Admin" : "Member",
-      watch: true, active: true, phone: "", cals: [], invitedAt: nowISO, joinedAt: "" };
+      watch: true, active: true, cals: [], invitedAt: nowISO, joinedAt: "" };
   }
   function inChargeId(st, t) {
     var a = st.settings.acting;
@@ -404,7 +404,6 @@ var Core = (function () {
           H.shareCal(st, p.email, false); p.email = ne; H.shareCal(st, ne, true);
         }
         if (P.name !== undefined) p.name = str(P.name, 80);
-        if (P.phone !== undefined) p.phone = str(P.phone, 40);
         if (P.watch !== undefined) p.watch = !!P.watch;
         if (P.role !== undefined) {
           var role = P.role === "Admin" ? "Admin" : "Member";
