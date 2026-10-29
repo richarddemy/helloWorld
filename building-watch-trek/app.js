@@ -771,9 +771,7 @@ function drawAdmin() {
   <label>Watch telephone (for the worker's email)<input id="mtWatchPhone" type="tel" value="${esc(st.watchPhone || "")}" placeholder="Set a phone number"></label>
   <div class="row start"><button class="btn" id="mtPhoneSave">Save watch phone</button><span id="mtPhoneStatus" class="why">${st.watchPhone ? "Saved number: " + esc(st.watchPhone) : "Requires the updated backend to save and include in emails."}</span></div>
   <p class="why">Testing: assign a current watch shift to a facilities user with a real, authorized email address. Enter a consenting real email on the Google Form and submit fictional work details. Check the Maintenance Staff log, the worker inbox, and the watchstander's inbox. The worker's email contains a one-time checkout link. A checkout triggers a separate watch alert.</p>
-  </div><div class="cols2">`;
-  if (!DEMO) loadMaintenanceTest();
-
+  </div><div class="cols2">
   <div class="panel"><h2>Who's in charge</h2>
     <label>Building manager<select id="adMgr">${opt(ppl, st.manager)}</select></label>
     <div class="why">When the manager is away, name an acting manager (CIC). They get full admin rights for those dates and show as in charge.</div>
@@ -821,6 +819,7 @@ function drawAdmin() {
     ${(st.mailLog || []).length ? `<div><h3 style="margin-bottom:6px">Recently sent</h3><ul class="list">${st.mailLog.slice().reverse().map(m => `<li><span>${esc(m.s)}</span><span class="mono">${m.n} people · ${md(m.t)} · ${esc(m.by || "")}</span></li>`).join("")}</ul></div>` : ""}</div>
   <div class="panel"><div class="row"><h2>Activity</h2><button class="btn small" id="adAudit">Show recent admin activity</button></div></div>`;
   fillTpl(); mlCount();
+  if (!DEMO) loadMaintenanceTest();
 }
 let maintenanceTestLoad = 0;
 async function loadMaintenanceTest() {
