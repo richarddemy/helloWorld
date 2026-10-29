@@ -1081,11 +1081,15 @@ function showWatchAlert(a) {
   const titles = { assistance: "🚨 Worker needs assistance", arrival: "Maintenance worker checked in", departure: "Maintenance worker checked out" };
   title.textContent = titles[a.kind] || "Building Watch notification";
   const body = document.createElement("div"); body.className = "bwBody";
-  body.textContent = [a.worker, a.shop, a.location ? "Location: " + a.location : "", a.message ? "Message: " + a.message : ""].filter(Boolean).join("\n");
+  // Everyone in the building sees the alert; it names who is expected to respond.
+  const who = a.you ? "You are the responder" : a.responder ? "Responder: " + a.responder : "";
+  body.textContent = [a.worker, a.shop, a.location ? "Location: " + a.location : "", a.message ? "Message: " + a.message : "", who].filter(Boolean).join("\n");
+  if (a.you && a.kind === "assistance") card.style.borderWidth = "4px";
   const controls = document.createElement("div"); controls.className = "bwActions";
   const open = document.createElement("button"); open.className = "btn primary";
   open.textContent = "Open maintenance log";
-  open.onclick = () => { tab = "log"; render(); card.remove(); };
+  // Reload so the new arrival or assistance request is on screen; keep unsaved painting if there is any.
+  open.onclick = () => { card.remove(); tab = "log"; if (dirty) { render(); toast("Save My week to refresh the log.", "err"); } else loadWeek(); };
   const dismiss = document.createElement("button"); dismiss.className = "btn";
   dismiss.textContent = "Dismiss"; dismiss.onclick = () => card.remove();
   controls.append(open, dismiss); card.append(title, body, controls);

@@ -364,7 +364,8 @@ var Core = (function () {
           task: str(P.task, 300) || (link ? link.loc + ": " + link.issue : ""), in: H.nowMin(), out: "",
           done: '', fu: '', ret: '', prob: '', newReq: '', by: nm(me), fuClosed: false,
           email: str(P.email, 120).toLowerCase(), emailConsent: !!P.emailConsent,
-          tokenHash: '', tokenExpiry: '', workerOutAt: '', watchOutAt: '', watchSeenAt: '', outBy: '' };
+          tokenHash: '', tokenExpiry: '', workerOutAt: '', watchOutAt: '', watchSeenAt: '', outBy: '',
+          inAt: H.nowISO(), helpAt: '', helpLocation: '', helpMessage: '' };
         st.log.push(l);
         if (link && (link.status === "Open" || link.status === "Submitted to PW")) { link.status = "In progress"; touch(st, "requests"); }
         touch(st, "log");
