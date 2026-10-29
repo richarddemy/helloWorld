@@ -752,6 +752,7 @@ function drawAdmin() {
   $("s-admin").innerHTML = `<div class="panel" id="maintenanceTestPanel">
   <div class="row"><div><h2>Maintenance staff — live check-in test</h2><p class="sub">Admin only. This creates a real entry in the maintenance log and sends real emails when the Google backend is configured. Maintenance staff never sign in to this app.</p></div><button class="btn" id="mtCheck">Check live connection</button></div>
   <div id="mtStatus" class="why">Checking QR check-in and notification setup…</div>
+  <div class="row start"><button class="btn" id="mtCreateForm" hidden>Create live QR check-in form</button></div>
   <div id="mtReady" hidden>
     <div class="row start" style="align-items:center;flex-wrap:wrap;gap:16px">
       <img id="mtQr" alt="QR code for the live maintenance check-in Google Form" width="170" height="170" style="background:white;padding:8px;border-radius:10px">
@@ -831,13 +832,15 @@ async function loadMaintenanceTest() {
     const r = await API.call("admin.test");
     if (ticket !== maintenanceTestLoad || !$("mtStatus")) return;
     if (r.demo) { status.textContent = "Browser demo only. Sign into the connected application to test actual Google Sheets logging and email."; return; }
+    $("mtCreateForm").hidden = true;
     const emailRemaining = r.mailLeft === undefined ? "unknown" : r.mailLeft;
     const watchEmails = Array.isArray(r.watchRecipients) ? r.watchRecipients : null;
     const watch = watchEmails ? (watchEmails.length ? "Watch notifications → " + watchEmails.join(", ") : "No valid watch recipient; configure a current watchstander or supervisor email.") : "Watch recipient validation requires the updated backend.";
     status.textContent = "Mail quota remaining: " + emailRemaining + ". " + watch;
     if (!r.formUrl || !/^https:\/\/(docs\.google\.com\/forms\/|forms\.gle\/)/.test(r.formUrl)) {
       status.textContent += " QR Google Form not configured. The Apps Script administrator must run setupWorkerForm() once, then redeploy the backend.";
-      $("mtReady").hidden = true; return;
+      $("mtReady").hidden = true;
+      $("mtCreateForm").hidden = false; return;
     }
     $("mtReady").hidden = false;
     $("mtFormUrl").value = r.formUrl;
@@ -859,6 +862,12 @@ $("s-admin").addEventListener("change", e => {
 $("s-admin").addEventListener("click", async e => {
   const t = e.target, d = t.dataset;
   if (t.id === "mtCheck") { await loadMaintenanceTest(); return; }
+  if (t.id === "mtCreateForm") {
+    if (!confirm("Create a public Google Form for maintenance check-in? Anyone with the form link will be able to submit a test entry. Use fictional details and consenting email addresses only.")) return;
+    const result = await act(() => API.call("admin.workerFormSetup"), "Maintenance check-in Form created");
+    if (result?.formUrl) await loadMaintenanceTest();
+    return;
+  }
   if (t.id === "mtManual") { openCI(); return; }
   if (t.id === "mtLog") { tab = "log"; await loadWeek(); return; }
   if (t.id === "mtCopy") {
