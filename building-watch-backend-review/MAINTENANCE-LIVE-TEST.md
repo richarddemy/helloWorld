@@ -1,29 +1,18 @@
-# Maintenance staff — live check-in & email testing
+# Maintenance QR check-in and Request Assistance — review procedure
 
-## The two populations
+**This feature has not been deployed to the live Apps Script or Hostinger backend.** See [ASSISTANCE-SETUP.md](ASSISTANCE-SETUP.md) for the complete integration and rollout plan, and [the draft pull request](https://github.com/richarddemy/helloWorld/pull/1) for oversight.
 
-- **Facilities team** signs into Building Watch and handles watch scheduling, shared crew assignments, supervisor approvals, and maintenance oversight.
-- **Maintenance staff/contractors** do **not** sign in. Their only entry is a public Google Form opened from a QR code; their checkout happens through an expiring private email link.
+The QR check-in link remains **admin-only** in Building Watch, under **Admin → Maintenance staff — live check-in test**. The linked Google Form is public to maintenance staff, who do **not** require a Building Watch account.
 
-The real QR link is available **only in the Admin tab of the signed-in application**. The link itself is public to anyone possessing it, as intended for visitor check-in.
+After submitting the form, consenting maintenance personnel receive an actual check-in email containing:
 
-## How to run the live test
+- **Check Out** — a private, expiring, single-use departure confirmation.
+- **Request Assistance** — a private, expiring form asking **Where are you?** and **What help do you need?**.
 
-1. Sign in as an admin at https://richarddemy.github.io/helloWorld/building-watch-trek/.
-2. In **Admin → Maintenance staff — live check-in test**, select **Check live connection**. This calls the role-protected `admin.test` endpoint; the returned `formUrl` is the actual Google Form, not a local browser mock. If none exists, the app offers **Create live QR check-in form** after the updated backend is deployed.
-3. Verify the active watch contact email(s) and available mail quota. The backend sends arrival notifications to all currently assigned watchstanders with valid email addresses. If none qualify, it falls back to the acting manager/manager. Fictional `.invalid` addresses cannot receive mail.
-4. Save a **Watch telephone** number in Admin so it appears as a clickable `tel:` link in the worker's actual email.
-5. Open the live Google Form with the QR or link, enter fictional test visit details, a consenting real email address, and opt in to receiving the checkout email.
-6. Open **Maintenance Staff → Refresh arrivals**. The Google Form trigger should have created an actual row in **Maintenance Log** in the Maintenance Workers spreadsheet.
-7. Check the consenting worker's inbox for a single-use checkout button and a Call the Watch button, and check the active watchstander's inbox for an arrival alert.
-8. Use the email checkout link to confirm departure and verify that a new departure alert reaches whoever is on watch. Admins can inspect the Test email delivery column to see which sends were **accepted by MailApp**, not whether they arrived in the recipient's inbox.
+The assistance request is routed to active watchstanders as a **background Web Push** notification when enabled, or to the acting building manager when no watch shift is active. While the app is open, targeted facilities personnel also receive an in-app alert pop-up, including the location and message, and can acknowledge it.
 
-The app no longer shows a simulated email preview or links the maintenance QR to `contractor.html`.
+No telephone or `tel:` links are part of the new email. Current status and subscription details are accessible to authorized app users only. Push device setup and backend deployment are required before live alert delivery can be tested.
 
-## Apps Script deployment boundary
+**To validate after deployment:** create a current watch shift for an authorized account with a subscribed phone; submit a QR Form with fictional data and a consenting real email; confirm the Maintenance Log entry and worker email; tap **Request Assistance**; verify the recipient's phone push notification and in-app alert; acknowledge it; finally check out and confirm the old assistance token no longer works.
 
-**GitHub Pages updates do not update the Apps Script web app.** The live mail and form enhancements require updating the existing Apps Script project with the latest tested `Code.gs` and `Core.gs`, authorizing its Mail/Forms/Sheets scopes, and publishing a **new version of the existing deployment**. Do not replace an independently modified live script without first backing it up and merging its changes.
-
-The staged `Code.gs` originally in this review directory is from the earlier single-sheet backend; it is not the latest five-sheet live-calendar + QR variant. The full five-sheet integration bundle was prepared as `building-watch-maintenance-email-test.zip` in the project chat for controlled deployment. This repository includes the latest `Core.gs` with permissions for crew assignments and a validated `watchPhone` setting.
-
-No live email has been sent from these repository changes. The live test requires a real form submission after deployment, and permission from the recipient.
+The old test ZIP sent a **Call the Watch** link; it is superseded by the changes in this feature branch and should not be deployed unchanged.
