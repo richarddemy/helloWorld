@@ -85,20 +85,20 @@ function endLoading() {
 /* ---------- API ---------- */
 let TOKEN = null;
 const API = {
-  async call(action, payload = {}) {
+  async call(action, payload = {}, quiet = false) {
     if (DEMO) return Demo.call(action, payload);
-    busyOn();
+    if (!quiet) busyOn();
     try {
       const r = await fetch(CFG.SCRIPT_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ token: TOKEN, action, payload }) });
       if (!r.ok) throw new Error("The server didn't answer (" + r.status + "). Try again.");
       const j = await r.json();
-      (j.warn || []).forEach(w => toast(w, "err"));
+      if (!quiet) (j.warn || []).forEach(w => toast(w, "err"));
       if (!j.ok) { const e = new Error(j.error || "Something went wrong."); e.code = j.code; throw e; }
       return j.data;
     } catch (e) {
       if (e instanceof TypeError) { const x = new Error("Can't reach the server. Check your connection."); throw x; }
       throw e;
-    } finally { busyOff(); }
+    } finally { if (!quiet) busyOff(); }
   }
 };
 
@@ -236,6 +236,7 @@ function profileGate(me) {
   $("pfGo").onclick = () => act(async () => { await API.call("profile.save", { name: $("pfName").value, phone: $("pfPhone").value }); boot(); });
 }
 function signOut(msg) {
+  stopWatchAlerts();
   TOKEN = null; try { sessionStorage.removeItem("bw-token"); } catch (e) {}
   try { if (window.google && google.accounts) google.accounts.id.disableAutoSelect(); } catch (e) {}
   startAuth(msg);
@@ -248,6 +249,7 @@ async function boot() {
     $("gate").hidden = true; $("app").hidden = false;
     $("demoBar").hidden = !DEMO; $("signOut").hidden = DEMO;
     await loadWeek();
+    startWatchAlerts();
   } finally { endLoading(); }
 }
 async function loadWeek(keepTab) {
@@ -947,6 +949,124 @@ $("s-admin").addEventListener("click", async e => {
 $("demoMember").onclick = () => { Demo.as = "member"; tab = null; loadWeek(); };
 $("demoAdmin").onclick = () => { Demo.as = "admin"; tab = null; loadWeek(); };
 $("demoReset").onclick = () => { Demo.st = seed(); Demo.save(); tab = null; report = null; loadWeek().then(() => toast("Demo data reset")); };
+
+
+/* ---------- maintenance-watch alerts (foreground only; push to follow) ---------- */
+let watchAlertTimer = null, watchAlertBusy = false, watchAlertUnsupported = false;
+let watchAudioCtx = null, watchAudioEnabled = false;
+const alertSeenKey = () => "bw-watch-alert-ids-" + (D?.me?.email || "").toLowerCase();
+function stopWatchAlerts() {
+  if (watchAlertTimer) clearInterval(watchAlertTimer);
+  watchAlertTimer = null;
+  watchAlertBusy = false;
+  $("bwAlertTray")?.remove();
+  $("bwSound")?.remove();
+}
+function watchSound() {
+  if (!watchAudioEnabled || !watchAudioCtx) return;
+  try {
+    if (watchAudioCtx.state === "suspended") watchAudioCtx.resume();
+    const t = watchAudioCtx.currentTime;
+    [0, 0.18].forEach((delay, i) => {
+      const osc = watchAudioCtx.createOscillator(), gain = watchAudioCtx.createGain();
+      osc.type = "sine"; osc.frequency.value = i ? 660 : 880;
+      gain.gain.setValueAtTime(0.0001, t + delay);
+      gain.gain.exponentialRampToValueAtTime(0.08, t + delay + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + delay + 0.16);
+      osc.connect(gain); gain.connect(watchAudioCtx.destination);
+      osc.start(t + delay); osc.stop(t + delay + 0.17);
+    });
+  } catch (e) { /* Muted or unsupported device; visual alert still appears. */ }
+}
+function ensureWatchAlertUI() {
+  if (!$("bwWatchStyle")) {
+    const css = document.createElement("style");
+    css.id = "bwWatchStyle";
+    css.textContent = `
+      #bwAlertTray{position:fixed;top:calc(10px + env(safe-area-inset-top));right:12px;left:12px;z-index:9999;max-width:460px;margin-left:auto;display:flex;flex-direction:column;gap:9px;pointer-events:none}
+      .bwWatchAlert{pointer-events:auto;background:var(--surface);border:2px solid var(--warn);box-shadow:0 10px 34px #0004;border-radius:11px;padding:15px;color:var(--ink)}
+      .bwWatchAlert strong{display:block;font-size:1.05rem;margin-bottom:4px}
+      .bwWatchAlert .bwBody{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45}
+      .bwWatchAlert .bwActions{display:flex;gap:9px;margin-top:11px;flex-wrap:wrap;align-items:center}
+      #bwSound{font:600 .8rem var(--f-body);padding:6px 9px;white-space:nowrap}
+    `;
+    document.head.appendChild(css);
+  }
+  if (!$("bwAlertTray")) {
+    const tray = document.createElement("div"); tray.id = "bwAlertTray";
+    tray.setAttribute("aria-live", "assertive"); tray.setAttribute("aria-atomic", "false");
+    document.body.appendChild(tray);
+  }
+  if (!$("bwSound")) {
+    const button = document.createElement("button");
+    button.id = "bwSound"; button.type = "button"; button.className = "btn small";
+    button.textContent = "🔕 Watch alerts: enable sound";
+    button.onclick = async () => {
+      try {
+        if (watchAudioEnabled) {
+          watchAudioEnabled = false;
+          button.textContent = "🔕 Watch alerts: enable sound";
+        } else {
+          const Ctx = window.AudioContext || window.webkitAudioContext;
+          if (!Ctx) throw new Error("This browser does not support audio alerts");
+          if (!watchAudioCtx) watchAudioCtx = new Ctx();
+          await watchAudioCtx.resume();
+          watchAudioEnabled = true;
+          button.textContent = "🔔 Watch alerts: sound on";
+          watchSound();
+        }
+      } catch (e) { toast(e.message || "Could not enable sound", "err"); }
+    };
+    ($("whoChip")?.parentElement || $("app")).appendChild(button);
+  }
+}
+function showWatchAlert(a) {
+  ensureWatchAlertUI();
+  const card = document.createElement("section");
+  card.className = "bwWatchAlert";
+  card.setAttribute("role", "alert");
+  const title = document.createElement("strong");
+  const titles = { assistance: "🚨 Worker needs assistance", arrival: "Maintenance worker checked in", departure: "Maintenance worker checked out" };
+  title.textContent = titles[a.kind] || "Building Watch notification";
+  const body = document.createElement("div"); body.className = "bwBody";
+  body.textContent = [a.worker, a.shop, a.location ? "Location: " + a.location : "", a.message ? "Message: " + a.message : ""].filter(Boolean).join("\n");
+  const controls = document.createElement("div"); controls.className = "bwActions";
+  const open = document.createElement("button"); open.className = "btn primary";
+  open.textContent = "Open maintenance log";
+  open.onclick = () => { tab = "log"; render(); card.remove(); };
+  const dismiss = document.createElement("button"); dismiss.className = "btn";
+  dismiss.textContent = "Dismiss"; dismiss.onclick = () => card.remove();
+  controls.append(open, dismiss); card.append(title, body, controls);
+  $("bwAlertTray").prepend(card);
+  while ($("bwAlertTray").children.length > 4) $("bwAlertTray").lastElementChild.remove();
+}
+async function pollWatchAlerts() {
+  if (DEMO || !D?.me || !TOKEN || document.hidden || watchAlertBusy || watchAlertUnsupported) return;
+  watchAlertBusy = true;
+  try {
+    const rows = await API.call("watch.alerts", {}, true);
+    if (!Array.isArray(rows)) return;
+    let ids = [];
+    try { ids = JSON.parse(localStorage.getItem(alertSeenKey()) || "[]"); } catch(e) {}
+    if (!Array.isArray(ids)) ids = [];
+    const seen = new Set(ids);
+    const incoming = rows.filter(a => a?.id && !seen.has(a.id) && Date.now() - Date.parse(a.at) < 10 * 60000);
+    rows.forEach(a => { if (a?.id) seen.add(a.id); });
+    try { localStorage.setItem(alertSeenKey(), JSON.stringify([...seen].slice(-150))); } catch(e) {}
+    incoming.slice(-4).forEach(showWatchAlert);
+    if (incoming.length) watchSound();
+  } catch (e) {
+    // Older deployments may not yet implement watch.alerts; do not flood the user.
+    if (e.code === "input" || /unknown|unsupported|action/i.test(e.message || "")) watchAlertUnsupported = true;
+  } finally { watchAlertBusy = false; }
+}
+function startWatchAlerts() {
+  if (DEMO || !TOKEN || !D?.me) return;
+  ensureWatchAlertUI();
+  if (!watchAlertTimer) watchAlertTimer = setInterval(pollWatchAlerts, 15000);
+  pollWatchAlerts();
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) pollWatchAlerts(); });
 
 /* ---------- start ---------- */
 if (DEMO) boot(); else startAuth();
