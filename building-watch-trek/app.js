@@ -271,9 +271,9 @@ async function loadWeek(keepTab) {
 function tabList() {
   const t = [["week", "My week"]];
   if (D.admin) t.push(["bill", "Watch bill"]);
-  t.push(["log", "Maintenance log"]);
-  t.push(["crew", D.admin ? "Crew assignments" : "My assignments"]);
-  t.push(["reqs", "Service requests"]);
+  t.push(["log", "Maintenance staff"]);
+  t.push(["crew", D.admin ? "Facilities team assignments" : "My facilities assignments"]);
+  t.push(["reqs", "Maintenance requests"]);
   if (D.admin) t.push(["reports", "Reports"], ["admin", "Admin"]);
   t.push(["mine", "My settings"]);
   return t;
@@ -499,6 +499,15 @@ async function saveWatch() {
 const reqOf = id => D.requests.find(x => x.id === id);
 const reqShort = id => { const r = reqOf(id); return r ? (r.wo || "Request") + " · " + r.loc : ""; };
 function drawLog() {
+  const entry = new URL("contractor.html", location.href).href;
+  const link = $("maintenanceQrLink");
+  if (link) {
+    link.value = entry;
+    $("maintenanceQrImage").src = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(entry);
+    $("maintenanceQrOpen").href = entry;
+    $("maintenanceQrCopy").onclick = () => navigator.clipboard.writeText(entry).then(() => toast("QR link copied")).catch(() => toast("Copy the URL from the field.", "err"));
+    $("maintenanceQrEmail").onclick = () => openModal("Maintenance email preview", "This is a demo. No email is sent.", `<p><b>Subject:</b> Building Watch — Maintenance Check-In Confirmation</p><p>Hello [worker],</p><p>You are checked in for [work description]. When leaving, open your personal checkout link. To reach the facilities watch, use the Call the Watch telephone link.</p><p><b>Checkout:</b> Individual expiring link issued by the live backend</p><p><b>Call the Watch:</b> Configured watch telephone number</p><p class="why">To test the complete screen flow, open the QR check-in page and enter fictional information. Real email delivery requires the backend QR/email integration.</p>`, '<button class="btn" data-act="cancel">Close</button>');
+  }
   const open = D.log.filter(l => !isOut(l)); $("nowCount").textContent = open.length || "";
   $("nowList").innerHTML = open.length ? open.map(l => `<li><div class="item"><b>${esc(l.worker)}</b><span class="why">${esc(l.shop)}${l.req ? " · " + esc(reqShort(l.req)) : ""}</span><span>${esc(l.task)}</span><span class="mono">In ${fmt(+l.in)}${l.date !== D.today ? " on " + md(l.date) : ""} · logged by ${esc(l.by)}</span></div><button class="btn small primary" data-co="${l.id}">Check out</button></li>`).join("") : "<li class='empty'>No workers in the building.</li>";
   const fu = followups();
