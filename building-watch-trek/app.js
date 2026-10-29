@@ -165,7 +165,7 @@ const DH = {
 };
 function seed() {
   const wk = week(), t = iso(new Date()), now = new Date().toISOString();
-  const P = (email, name, role, watch) => ({ id: Core.uid(), email, name, role, watch, active: true, phone: "", cals: [], invitedAt: now, joinedAt: now });
+  const P = (email, name, role, watch) => ({ id: Core.uid(), email, name, role, watch, active: true, cals: [], invitedAt: now, joinedAt: now });
   const people = [P("picard@demo.invalid", "Jean-Luc Picard", "Admin", true), P("riker@demo.invalid", "William Riker", "Admin", false), P("worf@demo.invalid", "Worf", "Member", true),
     P("data@demo.invalid", "Data", "Member", true), P("uhura@demo.invalid", "Nyota Uhura", "Member", true), P("sisko@demo.invalid", "Benjamin Sisko", "Member", true),
     P("janeway@demo.invalid", "Kathryn Janeway", "Member", true), P("kira@demo.invalid", "Kira Nerys", "Member", true), P("troi@demo.invalid", "Deanna Troi", "Member", true)];
