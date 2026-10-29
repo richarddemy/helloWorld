@@ -273,7 +273,7 @@ async function loadWeek(keepTab) {
 function tabList() {
   const t = [["week", "My week"]];
   if (D.admin) t.push(["bill", "Watch bill"]);
-  t.push(["log", "Maintenance staff"]);
+  t.push(["log", "Maintenance staff"], ["alerts", "Assistance alerts"]);
   t.push(["crew", D.admin ? "Facilities team assignments" : "My facilities assignments"]);
   t.push(["reqs", "Maintenance requests"]);
   if (D.admin) t.push(["reports", "Reports"], ["admin", "Admin"]);
@@ -286,16 +286,16 @@ const watchers = () => D.people.filter(p => p.watch && p.active !== false);
 function followups() { return D.log.filter(l => isOut(l) && !l.fuClosed && (l.done === "No" || l.done === "Partly" || l.fu || (l.prob && !l.newReq))); }
 
 function render() {
-  const b = { log: followups().length, reqs: D.admin ? D.requests.filter(r => r.status === "Open").length : 0 };
+  const b = { alerts: (D.assistanceAlerts || []).filter(a => a.status === "New").length, log: followups().length, reqs: D.admin ? D.requests.filter(r => r.status === "Open").length : 0 };
   $("tabs").innerHTML = tabList().map(([k, l]) => `<button role="tab" aria-selected="${k === tab}" data-tab="${k}">${l}${b[k] ? `<span class="badge">${b[k]}</span>` : ""}</button>`).join("");
   const wk = week();
   $("wkLabel").textContent = `Week of ${parse(wk[0]).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}`;
   const a = D.settings.acting;
   $("incharge").innerHTML = `Building manager: <b>${esc(D.manager || "not set")}</b>` + (D.inCharge && D.inCharge !== D.manager ? ` · In charge now: <b>${esc(D.inCharge)}</b> (acting${a.to ? " through " + md(a.to) : ""})` : "");
   $("whoChip").textContent = `${D.me.name}${D.admin ? " · Admin" : ""}`;
-  ["week", "bill", "log", "crew", "reqs", "reports", "admin", "mine"].forEach(k => $("s-" + k).hidden = k !== tab);
+  ["week", "bill", "log", "alerts", "crew", "reqs", "reports", "admin", "mine"].forEach(k => $("s-" + k).hidden = k !== tab);
   if (DEMO) { $("demoMember").setAttribute("aria-pressed", Demo.as === "member"); $("demoAdmin").setAttribute("aria-pressed", Demo.as === "admin"); }
-  ({ week: drawWeek, bill: drawBill, log: drawLog, crew: drawCrew, reqs: drawReqs, reports: drawReports, admin: drawAdmin, mine: drawMine })[tab]();
+  ({ week: drawWeek, bill: drawBill, log: drawLog, alerts: drawAlerts, crew: drawCrew, reqs: drawReqs, reports: drawReports, admin: drawAdmin, mine: drawMine })[tab]();
 }
 $("tabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (!b) return; if (dirty && tab === "week" && b.dataset.tab !== "week") toast("You have unsaved time on My week.", "err"); tab = b.dataset.tab; render(); });
 const leaveWeek = fn => () => { if (dirty) { openModal("Unsaved changes", "You painted time you haven't saved.", "", `<span></span><div class="row" style="gap:8px"><button class="btn" data-act="discard">Discard</button><button class="btn primary" data-act="saveThen">Save</button></div>`); pendingNav = fn; return; } fn(); };
@@ -500,6 +500,31 @@ async function saveWatch() {
 /* ---------- Maintenance log ---------- */
 const reqOf = id => D.requests.find(x => x.id === id);
 const reqShort = id => { const r = reqOf(id); return r ? (r.wo || "Request") + " · " + r.loc : ""; };
+function drawAlerts() {
+  const alerts = [...(D.assistanceAlerts || [])].reverse();
+  $("s-alerts").innerHTML = '<div class="panel"><div class="row"><h2>Assistance requests</h2><button class="btn" id="alertRefresh">Refresh</button></div>' +
+    '<p class="sub">Routed to the active watchstander or acting manager. No personal phone numbers are disclosed.</p><button class="btn primary" id="alertNew">Request assistance</button>' +
+    '<p class="why">Alerts appear when the app refreshes. Background device push requires a deployed notification service and recipient permission.</p><ul class="list">' +
+    (alerts.length ? alerts.map(a => '<li><div class="item"><b>' + esc(a.worker || "Maintenance staff") + '</b><span>' + esc(a.location) + ' — ' + esc(a.message) + '</span><span class="why">' + esc(a.createdAt) + ' · ' + esc(a.status) + '</span></div>' +
+      (a.status === "New" ? '<button class="btn primary small" data-alertack="' + esc(a.id) + '">Acknowledge</button>' : '') + '</li>').join('') : '<li class="empty">No assistance requests assigned to you.</li>') + '</ul></div>';
+}
+function requestAssistance() {
+  openModal("Request assistance", "Send your location and what you need to the watchstander or acting building manager.",
+    '<div class="form"><label class="full">Where are you?<input id="helpLoc" maxlength="120" placeholder="Deck 3, mechanical room"></label><label class="full">What assistance do you need?<textarea id="helpMsg" maxlength="700"></textarea></label></div>',
+    '<button class="btn" data-act="cancel">Cancel</button><button class="btn primary" id="helpSend">Send request</button>');
+  $("helpSend").onclick = async () => {
+    const location = $("helpLoc").value.trim(), message = $("helpMsg").value.trim();
+    if (!location || !message) return toast("Enter your location and assistance details.", "err");
+    const result = await act(() => API.call("assistance.create",{location,message}),"Assistance request recorded");
+    if (result) { closeModal(); await loadWeek(); }
+  };
+}
+$("s-alerts").addEventListener("click", async e => {
+  if (e.target.closest("#alertNew")) return requestAssistance();
+  if (e.target.closest("#alertRefresh")) return loadWeek();
+  const btn = e.target.closest("[data-alertack]");
+  if (btn && await act(() => API.call("assistance.ack",{id:btn.dataset.alertack}),"Request acknowledged")) await loadWeek();
+});
 function drawLog() {
   const open = D.log.filter(l => !isOut(l)); $("nowCount").textContent = open.length || "";
   $("nowList").innerHTML = open.length ? open.map(l => `<li><div class="item"><b>${esc(l.worker)}</b><span class="why">${esc(l.shop)}${l.req ? " · " + esc(reqShort(l.req)) : ""}</span><span>${esc(l.task)}</span>${l.helpAt ? `<span class="chip warn">Assistance requested</span><span><b>Location: ${esc(l.helpLocation || "Not specified")}</b> — ${esc(l.helpMessage || "I need help")}</span>` : ""}<span class="mono">In ${fmt(+l.in)}${l.date !== D.today ? " on " + md(l.date) : ""} · logged by ${esc(l.by)}</span></div><button class="btn small primary" data-co="${l.id}">Check out</button></li>`).join("") : "<li class='empty'>No workers in the building.</li>";
@@ -771,9 +796,8 @@ function drawAdmin() {
     <button class="btn" id="mtManual">Make a test log entry</button>
     <button class="btn" id="mtLog">Check maintenance log</button>
   </div>
-  <label>Watch telephone (for the worker's email)<input id="mtWatchPhone" type="tel" value="${esc(st.watchPhone || "")}" placeholder="Set a phone number"></label>
-  <div class="row start"><button class="btn" id="mtPhoneSave">Save watch phone</button><span id="mtPhoneStatus" class="why">${st.watchPhone ? "Saved number: " + esc(st.watchPhone) : "Requires the updated backend to save and include in emails."}</span></div>
-  <p class="why">Testing: assign a current watch shift to a facilities user with a real, authorized email address. Enter a consenting real email on the Google Form and submit fictional work details. Check the Maintenance Staff log, the worker inbox, and the watchstander's inbox. The worker's email contains a one-time checkout link. A checkout triggers a separate watch alert.</p>
+  <p class="why">Assistance requests go to the current watchstander, or the acting manager if nobody is on watch. No personal phone numbers are shared.</p>
+  <p class="why">Testing: assign a current watch shift to a facilities user with a real, authorized email address. Enter a consenting real email on the Google Form and submit fictional work details. Check the Maintenance Staff log, the worker inbox, and the watchstander's inbox. The worker email should include a Request Assistance link. True background push requires a deployed push service.</p>
   </div><div class="cols2">
   <div class="panel"><h2>Who's in charge</h2>
     <label>Building manager<select id="adMgr">${opt(ppl, st.manager)}</select></label>
@@ -877,17 +901,6 @@ $("s-admin").addEventListener("click", async e => {
     if (url) navigator.clipboard.writeText(url).then(() => toast("Real check-in link copied")).catch(() => toast("Select and copy the link above.", "err"));
     return;
   }
-  if (t.id === "mtPhoneSave") {
-    const value = $("mtWatchPhone").value.trim();
-    if (value && !/^\\+?[0-9().\\s-]{7,25}$/.test(value)) { toast("Enter a valid watch phone number.", "err"); return; }
-    const saved = await act(() => API.call("settings.save", { watchPhone:value }));
-    if (!saved) return;
-    if (saved.watchPhone !== value) { toast("The live backend does not support the watch phone setting yet. Update Apps Script first.", "err"); return; }
-    D.settings.watchPhone = saved.watchPhone;
-    $("mtPhoneStatus").textContent = value ? "Saved number: " + value : "No watch telephone configured.";
-    toast("Watch phone saved"); return;
-  }
-
   if (t.id === "adActSave") { await act(() => API.call("settings.save", { manager: $("adMgr").value, acting: { pid: $("adActWho").value, from: $("adActFrom").value, to: $("adActTo").value } }), "Saved"); await loadWeek(); }
   if (t.id === "adActClear") { await act(() => API.call("settings.save", { acting: { pid: "", from: "", to: "" } }), "Acting manager ended"); await loadWeek(); }
   if (t.id === 'adCalLoad') {
