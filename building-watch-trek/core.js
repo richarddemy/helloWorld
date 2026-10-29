@@ -160,8 +160,13 @@ var Core = (function () {
           return { label: str(c.label, 60) || "My calendar", url: str(c.url, 600), on: !!c.on };
         }).filter(function (c) { return c.url; });
         // Only secret iCal links. A bare calendar ID would be read with the app owner's access.
-        cals.forEach(function (c) {
-          if (!ICAL.test(c.url)) throw E("input", "\"" + c.label + "\" isn't an iCal link. Paste the calendar's secret address in iCal format (it starts with https:// or webcal://).");
+        // A new bad entry is refused; an old one saved before this rule is dropped so it can't block the save.
+        var had = (me.cals || []).map(function (c) { return c.url; });
+        cals = cals.filter(function (c) {
+          if (ICAL.test(c.url)) return true;
+          if (had.indexOf(c.url) < 0) throw E("input", "\"" + c.label + "\" isn't an iCal link. Paste the calendar's secret address in iCal format (it starts with https:// or webcal://).");
+          st._warn.push("\"" + c.label + "\" was removed because it isn't an iCal link. Add it again using its secret iCal address.");
+          return false;
         });
         me.cals = cals; touch(st, "people");
         return cals;
