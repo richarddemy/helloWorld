@@ -4,5 +4,7 @@
  */
 window.BW_CONFIG = {
  SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwWdaUxqFfcFokpY6R0q-Yauei56LcPfs--sYpzaf9meyzc-xfAFd7RmrYr8fn-UT_bLQ/exec',
+  // Web Push public VAPID key only. Configure with the private Hostinger dispatcher.
+  PUSH_PUBLIC_KEY: '',
   GOOGLE_CLIENT_ID: '173552030795-7c7rvjm88ul8is68thpbfj6uhrd89s43.apps.googleusercontent.com'
 };
