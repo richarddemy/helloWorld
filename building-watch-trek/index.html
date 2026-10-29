@@ -80,6 +80,9 @@ table.grid{border-collapse:separate;border-spacing:3px;width:100%;min-width:520p
 .grid td{height:24px;border-radius:4px;background:var(--h0);position:relative}
 #paintGrid,#heatGrid{touch-action:pan-x pinch-zoom;user-select:none;-webkit-user-select:none}\n@media(max-width:600px){table.grid{min-width:700px}.scroll:has(> table.grid){overscroll-behavior-x:contain}}
 #paintGrid td{cursor:crosshair}
+.grid tr.off th.t{color:var(--muted);font-style:italic}
+.grid tr.off td:not(.on):not([class*="l"]):not(.gap){opacity:.55}
+#heatGrid tr.std th.t{box-shadow:inset -3px 0 0 var(--muted)}
 #paintGrid td.on{background:var(--paint)}
 #paintGrid td.asg::after{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--accent)}
 .busy,#paintGrid td.busy{background-image:repeating-linear-gradient(135deg,var(--muted) 0 2px,transparent 2px 6px);background-color:var(--h0)}
@@ -199,12 +202,14 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
         <div><h2>When will you be in the building?</h2>
         <div class="sub">Drag down a day to paint your time. Drag over painted time to erase. Then save.</div></div>
         <div class="row" style="gap:8px">
+          <button class="btn small" data-hrs aria-pressed="false" hidden>Extended hours</button>
           <button class="btn small" id="copyMon">Copy Monday to all</button>
           <button class="btn small" id="clearMe">Clear week</button>
           <button class="btn small primary" id="saveMe">Save</button>
         </div>
       </div>
       <div class="scroll"><table class="grid" id="paintGrid"></table></div>
+      <div class="why" data-hrs-note hidden></div>
       <div class="legend">
         <span><span class="sw" style="background:var(--paint)"></span>In the building</span>
         <span><span class="sw" style="background:var(--accent);border-radius:50%"></span>You have the watch</span>
@@ -227,10 +232,13 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
           <span><span class="sw" style="background:var(--h4)"></span>4+</span>
           <span><span class="sw" style="outline:1.5px dashed var(--warn);outline-offset:-2px"></span>Nobody</span>
           <span><span class="sw" style="background:var(--accent);width:5px"></span>Watch</span>
+          <span><span class="sw" style="background:var(--muted);width:3px"></span>Usual watch hours</span>
         </div>
       </div>
-      <div class="pick" id="pickRow" role="group" aria-label="Watch standers"></div>
+      <div class="row" style="gap:8px"><div class="pick" id="pickRow" role="group" aria-label="Watch standers"></div>
+        <button class="btn small" data-hrs aria-pressed="false" hidden>Extended hours</button></div>
       <div class="scroll"><table class="grid" id="heatGrid"></table></div>
+      <div class="why" data-hrs-note hidden></div>
       <div id="slotInfo" class="empty">Drag down a day to set the watch for that block of time.</div>
     </div>
     <div class="panel">

@@ -4,8 +4,17 @@
 const CFG = window.BW_CONFIG || {};
 const qs = new URLSearchParams(location.search);
 const DEMO = !CFG.SCRIPT_URL || qs.has("demo");
-const NS = Core.NS, START = Core.START;
-const SLOTS = Array.from({ length: NS }, (_, i) => START + i * 30);
+/* Time grid. The live backend tells us its grid in "load"; an older backend sends none and
+ * still uses the 0730 to 1600 grid, so we fall back to that and never send it longer strings. */
+const LEGACY_GRID = { start: 450, ns: 17, duty: [1, 17], view: [0, 17], std: [[1, 5], [13, 17]] };
+let GRID = Core.grid(), NS = GRID.ns, START = GRID.start, SLOTS = [], ZERO = "";
+function setGrid(g) {
+  GRID = g && g.ns ? Object.assign({ view: [0, Math.min(17, g.ns)] }, g) : LEGACY_GRID; NS = GRID.ns; START = GRID.start;
+  SLOTS = Array.from({ length: NS }, (_, i) => START + i * 30); ZERO = "0".repeat(NS);
+}
+setGrid(DEMO ? Core.grid() : LEGACY_GRID);
+let extended = false;
+try { extended = localStorage.getItem("bw-extended") === "1"; } catch (e) {}
 const STATUSES = Core.STATUSES;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -18,7 +27,6 @@ const dayLbl = s => { const d = parse(s); return ["Sun", "Mon", "Tue", "Wed", "T
 const md = s => s ? (+s.slice(5, 7)) + "/" + (+s.slice(8, 10)) : "";
 const span = x => fmt(SLOTS[x.s]) + "-" + fmt(SLOTS[x.e - 1] + 30);
 const isOut = l => l.out !== "" && l.out != null;
-const ZERO = "0".repeat(NS);
 
 let weekStart = monday(new Date());
 const week = () => [0, 1, 2, 3, 4].map(i => addDays(weekStart, i));
@@ -152,7 +160,7 @@ function seed() {
   const people = [P("picard@demo.invalid", "Jean-Luc Picard", "Admin", true), P("riker@demo.invalid", "William Riker", "Admin", false), P("worf@demo.invalid", "Worf", "Member", true),
     P("data@demo.invalid", "Data", "Member", true), P("uhura@demo.invalid", "Nyota Uhura", "Member", true), P("sisko@demo.invalid", "Benjamin Sisko", "Member", true),
     P("janeway@demo.invalid", "Kathryn Janeway", "Member", true), P("kira@demo.invalid", "Kira Nerys", "Member", true), P("troi@demo.invalid", "Deanna Troi", "Member", true)];
-  people[0].cals = [{ label: "My Google Calendar", url: "demo", on: true }];
+  people[0].cals = [{ label: "My Google Calendar", url: "https://demo.invalid/calendar.ics", on: true }];
   const id = n => people.find(p => p.name === n).id;
   const avail = [];
   const block = (n, d, a, b) => { const date = wk[d]; let r = avail.find(x => x.pid === id(n) && x.date === date); if (!r) { r = { pid: id(n), date, slots: ZERO, ev: [] }; avail.push(r); }
@@ -258,6 +266,7 @@ async function loadWeek(keepTab) {
   const d = await act(() => API.call("load", { week: week() }));
   if (!d) return;
   D = d;
+  setGrid(D.grid);
   myDays = {}; week().forEach(date => { const a = D.avail.find(x => x.pid === D.me.id && x.date === date); myDays[date] = (a ? a.slots : ZERO).split(""); });
   dirty = false; busy = [];
   const tabs = tabList().map(x => x[0]);
@@ -322,13 +331,50 @@ $("dlgAct").addEventListener("click", e => {
     saveThen: async () => { closeModal(); await saveMyWeek(); const f = pendingNav; pendingNav = null; f && f(); } })[a]?.();
 });
 
+/* ---------- Duty day and extended hours ---------- */
+const canExtend = () => GRID.ns > GRID.view[1] || GRID.view[0] > 0;
+const inDuty = i => i >= GRID.duty[0] && i < GRID.duty[1];
+const inView = i => i >= GRID.view[0] && i < GRID.view[1];
+const inStd = i => GRID.std.some(([a, b]) => i >= a && i < b);
+// Anything scheduled outside the duty day this week, so it is never hidden from view.
+function outsideThisWeek() {
+  const wk = week();
+  return D.watches.some(w => wk.includes(w.date) && (w.s < GRID.view[0] || w.e > GRID.view[1])) ||
+    D.avail.some(a => wk.includes(a.date) && a.slots.split("").some((c, i) => c === "1" && !inView(i))) ||
+    Object.values(myDays).some(arr => arr.some((c, i) => c === "1" && !inView(i)));
+}
+const showAll = () => canExtend() && (extended || outsideThisWeek());
+const viewIdx = () => SLOTS.map((_, i) => i).filter(i => showAll() || inView(i));
+const rowCls = i => (inDuty(i) ? "" : "off") + (inStd(i) ? " std" : "");
+function drawHoursUI() {
+  const forced = canExtend() && !extended && outsideThisWeek();
+  document.querySelectorAll("[data-hrs]").forEach(b => {
+    b.hidden = !canExtend(); b.setAttribute("aria-pressed", String(showAll()));
+    b.textContent = showAll() ? "Duty day only" : "Extended hours";
+    b.disabled = forced;
+    b.title = forced ? "Time is scheduled after 1600 this week, so it stays visible." : "";
+  });
+  const last = SLOTS[NS - 1] + 30, lastLbl = last >= 1440 ? "2400" : fmt(last);
+  document.querySelectorAll("[data-hrs-note]").forEach(n => {
+    n.textContent = showAll() ? `Showing ${fmt(START)} to ${lastLbl}. Shaded rows are outside the 0800 to 1600 duty day.` +
+      (forced ? " Time is scheduled after 1600 this week, so these hours stay open." : "") : "";
+    n.hidden = !showAll();
+  });
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-hrs]"); if (!b) return;
+  extended = !extended; try { localStorage.setItem("bw-extended", extended ? "1" : "0"); } catch (err) {}
+  if (tab === "week") drawPaint(); if (tab === "bill") drawHeat();
+});
+
 /* ---------- My week ---------- */
 const mineAt = (date, i) => myDays[date] && myDays[date][i] === "1";
 function drawPaint() {
   const wk = week(), t = D.today, hasCal = (D.me.cals || []).some(c => c.on);
   let html = "<tr><th class='t'></th>" + wk.map(d => `<th class="${d === t ? "today" : ""}">${dayLbl(d)}</th>`).join("") + "</tr>";
-  SLOTS.forEach((m, i) => {
-    html += "<tr><th class='t'>" + (m % 60 ? "" : fmt(m)) + "</th>";
+  viewIdx().forEach(i => {
+    const m = SLOTS[i];
+    html += `<tr class="${rowCls(i)}"><th class='t'>` + (m % 60 ? "" : fmt(m)) + "</th>";
     wk.forEach(date => {
       const on = mineAt(date, i), a = D.watches.some(x => x.pid === D.me.id && x.date === date && i >= x.s && i < x.e);
       const b = busy.find(x => x.date === date && i >= x.s && i < x.e);
@@ -337,6 +383,7 @@ function drawPaint() {
     html += "</tr>";
   });
   $("paintGrid").innerHTML = html;
+  drawHoursUI();
   $("dirtyNote").hidden = !dirty;
   $("calNote").textContent = hasCal ? `Showing your own calendar so you can see what you already have. Only you see these titles.` : `Tip: add your own calendar in My settings to see what you already have while you paint.`;
 }
@@ -394,8 +441,9 @@ pg.addEventListener("pointerup", e => {
   if (painting) { painting = null; drawPaint(); }
 });
 pg.addEventListener("pointercancel", () => { paintTouch = null; if (painting) { painting = null; drawPaint(); } });
-$("clearMe").onclick = () => { week().forEach(d => myDays[d] = ZERO.split("")); dirty = true; drawPaint(); };
-$("copyMon").onclick = () => { const mon = myDays[week()[0]].slice(); week().slice(1).forEach(d => myDays[d] = mon.slice()); dirty = true; drawPaint(); toast("Monday copied to the whole week. Save when ready."); };
+// Clear and copy act only on the hours on screen, so hidden evening time is never wiped by surprise.
+$("clearMe").onclick = () => { const v = viewIdx(); week().forEach(d => v.forEach(i => myDays[d][i] = "0")); dirty = true; drawPaint(); };
+$("copyMon").onclick = () => { const v = viewIdx(), mon = myDays[week()[0]]; week().slice(1).forEach(d => v.forEach(i => myDays[d][i] = mon[i])); dirty = true; drawPaint(); toast("Monday copied to the whole week. Save when ready."); };
 async function saveMyWeek() {
   const days = {}; week().forEach(d => days[d] = myDays[d].join(""));
   const r = await act(() => API.call("avail.save", { days }), "Saved to the calendar");
@@ -414,8 +462,9 @@ $("pickRow").addEventListener("click", e => { const b = e.target.closest("button
 function drawHeat() {
   const wk = week(), t = D.today;
   let html = "<tr><th class='t'></th>" + wk.map(d => `<th class="${d === t ? "today" : ""}">${dayLbl(d)}</th>`).join("") + "</tr>";
-  SLOTS.forEach((m, i) => {
-    html += "<tr><th class='t'>" + (m % 60 ? "" : fmt(m)) + "</th>";
+  viewIdx().forEach(i => {
+    const m = SLOTS[i];
+    html += `<tr class="${rowCls(i)}"><th class='t'>` + (m % 60 ? "" : fmt(m)) + "</th>";
     wk.forEach((date, d) => {
       const c = whoIn(date, i).length, w = standers(date, i).length;
       const cls = (c === 0 ? "gap" : "l" + Math.min(c, 4)) + (sel && sel.d === d && i >= sel.s && i < sel.e ? " sel" : "") + (w ? " w" : "") + (w > 1 ? " w2" : "");
@@ -424,6 +473,7 @@ function drawHeat() {
     html += "</tr>";
   });
   $("heatGrid").innerHTML = html;
+  drawHoursUI();
 }
 function drawBill() {
   drawPick(); drawHeat();

@@ -5,8 +5,19 @@
  * touches the outside world goes through the hooks object H.
  */
 var Core = (function () {
-  var NS = 17;          // half-hour slots per day
+  /* Time grid. Slot i covers START + 30*i minutes after midnight.
+   * START must never change: every stored availability string and watch index depends on it.
+   * NS may grow (extended hours); shorter stored strings are padded on read. */
   var START = 450;      // first slot starts 0730 (minutes after midnight)
+  var NS = 33;          // half-hour slots per day: 0730 to 2400
+  var LEGACY_NS = 17;   // grid before extended hours (0730 to 1600); older clients still send this
+  var DUTY = [1, 17];   // duty day 0800 to 1600 (rows outside it are shaded)
+  var VIEW = [0, 17];   // default view 0730 to 1600, so early arrivals stay visible
+  var STD_WATCH = [[1, 5], [13, 17]]; // usual watches 0800 to 1000 and 1400 to 1600
+  var ICAL = /^(https|webcal):\/\/[^\s]+$/i;
+  // Contractor contact details are for admins only; checkout tokens never leave the server.
+  var LOG_SECRET = ["tokenHash", "tokenExpiry"];
+  var LOG_ADMIN_ONLY = ["email", "emailConsent", "workerEmailSentAt", "watchArrivalAlertTo", "watchDepartureAlertTo"];
   var STATUSES = ["Open", "Submitted to PW", "In progress", "Closed"];
   var DEF_TMPL = [
     "Walk all decks and stairwells",
@@ -31,6 +42,18 @@ var Core = (function () {
   }
   function nm(p) { return p ? (p.name || p.email) : ""; }
   function isOut(l) { return l.out !== "" && l.out != null; }
+  function zeros(n) { return n > 0 ? new Array(n + 1).join("0") : ""; }
+  function fitSlots(s) { s = String(s || ""); return s.length >= NS ? s.slice(0, NS) : s + zeros(NS - s.length); }
+  function grid() { return { start: START, ns: NS, duty: DUTY.slice(), view: VIEW.slice(), std: STD_WATCH.map(function (x) { return x.slice(); }) }; }
+  function logView(l, admin) {
+    var o = {};
+    Object.keys(l).forEach(function (k) {
+      if (k.charAt(0) === "_" || LOG_SECRET.indexOf(k) >= 0) return;
+      if (!admin && LOG_ADMIN_ONLY.indexOf(k) >= 0) return;
+      o[k] = l[k];
+    });
+    return o;
+  }
 
   function defaults() {
     return {
@@ -45,6 +68,7 @@ var Core = (function () {
     Object.keys(d).forEach(function (k) { if (s[k] === undefined || s[k] === "") s[k] = d[k]; });
     if (!s.acting || typeof s.acting !== "object") s.acting = { pid: "", from: "", to: "" };
     st.settings = s;
+    st.avail.forEach(function (a) { if (String(a.slots || "").length !== NS) a.slots = fitSlots(a.slots); });
     st._dirty = st._dirty || {};
     st._warn = st._warn || [];
     return st;
@@ -86,8 +110,8 @@ var Core = (function () {
     return o;
   }
   function audit(st, p, action, detail, H) {
+    // Audit rows are never dropped here; the backend's archiveOld() moves old rows to an archive tab.
     st.audit.push({ t: H.nowISO(), who: nm(p), action: action, detail: str(detail, 300) });
-    if (st.audit.length > 1000) st.audit = st.audit.slice(-1000);
     touch(st, "audit");
   }
   function publicSettings(st, admin) {
@@ -135,11 +159,17 @@ var Core = (function () {
         var cals = (P.cals || []).slice(0, 5).map(function (c) {
           return { label: str(c.label, 60) || "My calendar", url: str(c.url, 600), on: !!c.on };
         }).filter(function (c) { return c.url; });
+        // Only secret iCal links. A bare calendar ID would be read with the app owner's access.
+        cals.forEach(function (c) {
+          if (!ICAL.test(c.url)) throw E("input", "\"" + c.label + "\" isn't an iCal link. Paste the calendar's secret address in iCal format (it starts with https:// or webcal://).");
+        });
         me.cals = cals; touch(st, "people");
         return cals;
       }
       case "busy": {
         var on = (me.cals || []).filter(function (c) { return c.on; });
+        on.forEach(function (c) { if (!ICAL.test(c.url)) st._warn.push("\"" + c.label + "\" was skipped. Remove it and add it again using its secret iCal address."); });
+        on = on.filter(function (c) { return ICAL.test(c.url); });
         if (!on.length || !(P.week || []).length) return [];
         return H.fetchBusy(st, on, P.week);
       }
@@ -155,7 +185,7 @@ var Core = (function () {
         var ic = byId(st.people, inChargeId(st, t)), mg = byId(st.people, st.settings.manager);
         var meFull = pub(me, true); meFull.cals = me.cals || [];
         return {
-          me: meFull, admin: admin, today: t,
+          me: meFull, admin: admin, today: t, grid: grid(),
           inCharge: nm(ic), manager: nm(mg),
           people: st.people.filter(function (p) { return admin || p.active !== false; }).map(function (p) { return pub(p, admin); }),
           avail: st.avail.filter(function (a) { return inWk(a.date) && (admin || a.pid === me.id); })
@@ -166,7 +196,7 @@ var Core = (function () {
           crewAssignments: st.crewAssignments.filter(function (x) { return admin || (x.assignees || []).indexOf(me.id) >= 0; }).map(function (x) { return Object.assign({}, x); }),
           crewActivity: st.crewActivity.filter(function (x) { return admin || st.crewAssignments.some(function (a) { return a.id === x.assignmentId && (a.assignees || []).indexOf(me.id) >= 0; }); }).slice(-500),
           requests: st.requests.slice(-400),
-          log: st.log.filter(function (l) { return !isOut(l) || l.date >= since; }).slice(-400),
+          log: st.log.filter(function (l) { return !isOut(l) || l.date >= since; }).slice(-400).map(function (l) { return logView(l, admin); }),
           settings: publicSettings(st, admin)
         };
       }
@@ -177,9 +207,11 @@ var Core = (function () {
         Object.keys(days).forEach(function (date) {
           if (!isDate(date)) return;
           var slots = String(days[date]);
-          if (!/^[01]+$/.test(slots) || slots.length !== NS) return;
+          if (!/^[01]+$/.test(slots) || (slots.length !== NS && slots.length !== LEGACY_NS)) return;
           var rec = null, idx = -1;
           for (var i = 0; i < st.avail.length; i++) if (st.avail[i].pid === me.id && st.avail[i].date === date) { rec = st.avail[i]; idx = i; }
+          // An older client only knows 0730 to 1600: keep whatever evening time is already saved.
+          if (slots.length === LEGACY_NS) slots = fitSlots(slots + (rec ? fitSlots(rec.slots).slice(LEGACY_NS) : ""));
           if (rec && rec.slots === slots) return;
           var ev = H.syncAvail(st, me, date, slots, rec ? (rec.ev || []) : []);
           if (slots.indexOf("1") < 0) { if (idx >= 0) st.avail.splice(idx, 1); }
@@ -331,7 +363,7 @@ var Core = (function () {
         st.log.push(l);
         if (link && (link.status === "Open" || link.status === "Submitted to PW")) { link.status = "In progress"; touch(st, "requests"); }
         touch(st, "log");
-        return l;
+        return logView(l, admin);
       }
       case "log.out": {
         var l2 = byId(st.log, P.id);
@@ -346,20 +378,20 @@ var Core = (function () {
           if (lr) { lr.status = l2.done === "Yes" && !l2.fu ? "Closed" : "In progress"; touch(st, "requests"); }
         }
         touch(st, "log");
-        return l2;
+        return logView(l2, admin);
       }
       case "log.resolve": {
         need();
         var l3 = byId(st.log, P.id); if (!l3) throw E("missing", "Log entry not found.");
         l3.fuClosed = true; touch(st, "log");
-        return l3;
+        return logView(l3, admin);
       }
       case "log.makeReq": {
         var l4 = byId(st.log, P.id); if (!l4) throw E("missing", "Log entry not found.");
-        if (!l4.prob || l4.newReq) return l4;
+        if (!l4.prob || l4.newReq) return logView(l4, admin);
         l4.newReq = newReq(st, me, t, P.loc || "See description", l4.prob, "Routine").id;
         touch(st, "log");
-        return l4;
+        return logView(l4, admin);
       }
 
       /* ---------- reports ---------- */
@@ -371,7 +403,7 @@ var Core = (function () {
           people: st.people.map(function (p) { return pub(p, true); }),
           avail: st.avail.filter(function (a) { return inR(a.date); }).map(function (a) { return { pid: a.pid, date: a.date, slots: a.slots }; }),
           watches: st.watches.filter(function (w) { return inR(w.date); }).map(function (w) { return { id: w.id, pid: w.pid, date: w.date, s: +w.s, e: +w.e, checks: w.checks || {} }; }),
-          log: st.log.filter(function (l) { return inR(l.date); }),
+          log: st.log.filter(function (l) { return inR(l.date); }).map(function (l) { return logView(l, true); }),
           requests: st.requests.filter(function (r) { return inR(r.date); }),
           tmplLen: st.settings.tmpl.length
         };
@@ -479,7 +511,8 @@ var Core = (function () {
   }
 
   return {
-    NS: NS, START: START, STATUSES: STATUSES, DEF_TMPL: DEF_TMPL,
+    NS: NS, START: START, LEGACY_NS: LEGACY_NS, DUTY: DUTY, STD_WATCH: STD_WATCH, STATUSES: STATUSES, DEF_TMPL: DEF_TMPL,
+    grid: grid, fitSlots: fitSlots, logView: logView,
     handle: handle, ensure: ensure, findEmail: findEmail, newPerson: newPerson, isAdmin: isAdmin,
     inChargeId: inChargeId, runs: runs, nm: nm, uid: uid, addDays: addDays, lc: lc, E: E
   };
