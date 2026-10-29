@@ -34,13 +34,13 @@ var Core = (function () {
 
   function defaults() {
     return {
-      calId: "", calName: "Building Watch", invites: true, remind: 30, watchPhone: "",
+      calId: "", calName: "Building Watch", invites: true, remind: 30,
       manager: "", acting: { pid: "", from: "", to: "" },
       tmpl: DEF_TMPL.slice(), appUrl: "", mailLog: []
     };
   }
   function ensure(st) {
-    ["people", "avail", "watches", "requests", "log", "audit", "crewAssignments", "crewActivity"].forEach(function (k) { st[k] = st[k] || []; });
+    ["people", "avail", "watches", "requests", "log", "audit", "crewAssignments", "crewActivity", "assistanceAlerts"].forEach(function (k) { st[k] = st[k] || []; });
     var d = defaults(), s = st.settings || {};
     Object.keys(d).forEach(function (k) { if (s[k] === undefined || s[k] === "") s[k] = d[k]; });
     if (!s.acting || typeof s.acting !== "object") s.acting = { pid: "", from: "", to: "" };
@@ -93,7 +93,7 @@ var Core = (function () {
   function publicSettings(st, admin) {
     var s = st.settings;
     var o = { calName: s.calName, calId: s.calId, invites: s.invites, remind: s.remind, tmpl: s.tmpl,
-      appUrl: s.appUrl, manager: s.manager, acting: s.acting, watchPhone: s.watchPhone || "" };
+      appUrl: s.appUrl, manager: s.manager, acting: s.acting };
     if (admin) o.mailLog = (s.mailLog || []).slice(-10);
     return o;
   }
@@ -155,6 +155,7 @@ var Core = (function () {
         var ic = byId(st.people, inChargeId(st, t)), mg = byId(st.people, st.settings.manager);
         var meFull = pub(me, true); meFull.cals = me.cals || [];
         return {
+          assistanceAlerts: st.assistanceAlerts.filter(function (a) { return a.recipientIds.indexOf(me.id) >= 0; }).slice(-100).map(function (a) { return { id:a.id, createdAt:a.createdAt, location:a.location, message:a.message, worker:a.worker, status:a.status, acknowledgedBy:a.acknowledgedBy || "", acknowledgedAt:a.acknowledgedAt || "" }; }),
           me: meFull, admin: admin, today: t,
           inCharge: nm(ic), manager: nm(mg),
           people: st.people.filter(function (p) { return admin || p.active !== false; }).map(function (p) { return pub(p, admin); }),
@@ -303,6 +304,34 @@ var Core = (function () {
         touch(st, "crewActivity"); audit(st, me, "crew.review", a.id + " " + a.status, H); return a;
       }
 
+      /* Assistance alerts are persisted and scoped to the on-watch team. */
+      case "assistance.create": {
+        var loc = str(P.location, 120), message = str(P.message, 700);
+        if (!loc || !message) throw E("input", "Location and assistance details are required.");
+        var now = H.nowISO(), nowMinutes = H.nowMin();
+        var active = st.watches.filter(function (w) { return w.date === t && +w.s <= nowMinutes && +w.e > nowMinutes; })
+          .map(function (w) { return w.pid; });
+        var recipients = uniq(active.filter(function (id) { var p = byId(st.people,id); return p && p.active !== false; }));
+        if (!recipients.length) {
+          var fallback = inChargeId(st,t), supervisor = byId(st.people,fallback);
+          if (supervisor && supervisor.active !== false) recipients = [fallback];
+        }
+        if (!recipients.length) throw E("unavailable", "No watchstander or acting manager is available. Contact the facilities office directly.");
+        var alert = { id:uid(), createdAt:now, location:loc, message:message, worker:str(P.worker,80) || nm(me),
+          recipientIds:recipients, status:"New", acknowledgedBy:"", acknowledgedAt:"" };
+        st.assistanceAlerts.push(alert); touch(st,"assistanceAlerts");
+        audit(st,me,"assistance.create",alert.id,H);
+        return { id:alert.id, status:alert.status, recipients:recipients.length };
+      }
+      case "assistance.ack": {
+        var alert = byId(st.assistanceAlerts,P.id);
+        if (!alert || alert.recipientIds.indexOf(me.id) < 0) throw E("forbidden","Alert not assigned to you.");
+        if (alert.status !== "Acknowledged") {
+          alert.status = "Acknowledged"; alert.acknowledgedBy = me.id; alert.acknowledgedAt = H.nowISO();
+          touch(st,"assistanceAlerts"); audit(st,me,"assistance.ack",alert.id,H);
+        }
+        return { id:alert.id, status:alert.status };
+      }
       /* ---------- service requests ---------- */
       case "req.new": {
         if (!str(P.issue)) throw E("input", "Describe the problem.");
@@ -444,43 +473,4 @@ var Core = (function () {
         if (P.invites !== undefined) S.invites = !!P.invites;
         if (P.remind !== undefined) S.remind = +P.remind || 0;
         if (P.appUrl !== undefined) S.appUrl = str(P.appUrl, 300);
-        if (P.watchPhone !== undefined) {
-          var phone = str(P.watchPhone, 30);
-          if (phone && !/^\+?[0-9().\s-]{7,25}$/.test(phone)) throw E("input", "Enter a valid watch telephone number.");
-          S.watchPhone = phone;
-        }
-        if (P.manager !== undefined && byId(st.people, P.manager)) S.manager = P.manager;
-        if (P.acting !== undefined) {
-          var a = P.acting || {};
-          S.acting = { pid: byId(st.people, a.pid) ? a.pid : "", from: isDate(a.from) ? a.from : "", to: isDate(a.to) ? a.to : "" };
-        }
-        touch(st, "settings");
-        audit(st, me, "settings.save", "", H);
-        return publicSettings(st, true);
-      }
-      case "mail.send": {
-        need();
-        var to = (P.pids || []).map(function (id) { return byId(st.people, id); })
-          .filter(function (x) { return x && x.active !== false && isEmail(x.email); });
-        if (!to.length) throw E("input", "Pick at least one recipient.");
-        var subject = str(P.subject, 200) || "(no subject)";
-        var n2 = H.sendMail(st, to.map(function (x) { return x.email; }), subject, str(P.body, 10000), nm(me));
-        st.settings.mailLog = (st.settings.mailLog || []).concat([{ s: subject, n: n2, t: t, by: nm(me) }]).slice(-50);
-        touch(st, "settings");
-        audit(st, me, "mail.send", subject + " to " + n2, H);
-        return { sent: n2 };
-      }
-      case "audit.list": {
-        need();
-        return st.audit.slice(-200).reverse();
-      }
-    }
-    throw E("input", "Unknown action: " + action);
-  }
 
-  return {
-    NS: NS, START: START, STATUSES: STATUSES, DEF_TMPL: DEF_TMPL,
-    handle: handle, ensure: ensure, findEmail: findEmail, newPerson: newPerson, isAdmin: isAdmin,
-    inChargeId: inChargeId, runs: runs, nm: nm, uid: uid, addDays: addDays, lc: lc, E: E
-  };
-})();
