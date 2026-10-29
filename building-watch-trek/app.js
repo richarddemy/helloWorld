@@ -499,15 +499,6 @@ async function saveWatch() {
 const reqOf = id => D.requests.find(x => x.id === id);
 const reqShort = id => { const r = reqOf(id); return r ? (r.wo || "Request") + " · " + r.loc : ""; };
 function drawLog() {
-  const entry = new URL("contractor.html", location.href).href;
-  const link = $("maintenanceQrLink");
-  if (link) {
-    link.value = entry;
-    $("maintenanceQrImage").src = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(entry);
-    $("maintenanceQrOpen").href = entry;
-    $("maintenanceQrCopy").onclick = () => navigator.clipboard.writeText(entry).then(() => toast("QR link copied")).catch(() => toast("Copy the URL from the field.", "err"));
-    $("maintenanceQrEmail").onclick = () => openModal("Maintenance email preview", "This is a demo. No email is sent.", `<p><b>Subject:</b> Building Watch — Maintenance Check-In Confirmation</p><p>Hello [worker],</p><p>You are checked in for [work description]. When leaving, open your personal checkout link. To reach the facilities watch, use the Call the Watch telephone link.</p><p><b>Checkout:</b> Individual expiring link issued by the live backend</p><p><b>Call the Watch:</b> Configured watch telephone number</p><p class="why">To test the complete screen flow, open the QR check-in page and enter fictional information. Real email delivery requires the backend QR/email integration.</p>`, '<button class="btn" data-act="cancel">Close</button>');
-  }
   const open = D.log.filter(l => !isOut(l)); $("nowCount").textContent = open.length || "";
   $("nowList").innerHTML = open.length ? open.map(l => `<li><div class="item"><b>${esc(l.worker)}</b><span class="why">${esc(l.shop)}${l.req ? " · " + esc(reqShort(l.req)) : ""}</span><span>${esc(l.task)}</span><span class="mono">In ${fmt(+l.in)}${l.date !== D.today ? " on " + md(l.date) : ""} · logged by ${esc(l.by)}</span></div><button class="btn small primary" data-co="${l.id}">Check out</button></li>`).join("") : "<li class='empty'>No workers in the building.</li>";
   const fu = followups();
@@ -753,7 +744,31 @@ const TEMPLATES = {
 const opt = (list, v) => list.map(([val, lbl]) => `<option value="${esc(val)}" ${val === v ? "selected" : ""}>${esc(lbl)}</option>`).join("");
 function drawAdmin() {
   const st = D.settings, a = st.acting || {}, active = D.people.filter(p => p.active !== false), ppl = active.map(p => [p.id, p.name]);
-  $("s-admin").innerHTML = `<div class="cols2">
+  $("s-admin").innerHTML = `<div class="panel" id="maintenanceTestPanel">
+  <div class="row"><div><h2>Maintenance staff — live check-in test</h2><p class="sub">Admin only. This creates a real entry in the maintenance log and sends real emails when the Google backend is configured. Maintenance staff never sign in to this app.</p></div><button class="btn" id="mtCheck">Check live connection</button></div>
+  <div id="mtStatus" class="why">Checking QR check-in and notification setup…</div>
+  <div id="mtReady" hidden>
+    <div class="row start" style="align-items:center;flex-wrap:wrap;gap:16px">
+      <img id="mtQr" alt="QR code for the live maintenance check-in Google Form" width="170" height="170" style="background:white;padding:8px;border-radius:10px">
+      <div style="flex:1;min-width:220px">
+        <label>Live maintenance staff check-in URL<input id="mtFormUrl" type="url" readonly></label>
+        <div class="row start">
+          <a id="mtOpen" class="btn primary" href="#" target="_blank" rel="noopener">Open real check-in form</a>
+          <button class="btn" id="mtCopy">Copy check-in link</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="row start" style="margin-top:12px">
+    <button class="btn" id="mtManual">Make a test log entry</button>
+    <button class="btn" id="mtLog">Check maintenance log</button>
+  </div>
+  <label>Watch telephone (for the worker's email)<input id="mtWatchPhone" type="tel" value="${esc(st.watchPhone || "")}" placeholder="Set a phone number"></label>
+  <div class="row start"><button class="btn" id="mtPhoneSave">Save watch phone</button><span id="mtPhoneStatus" class="why">${st.watchPhone ? "Saved number: " + esc(st.watchPhone) : "Requires the updated backend to save and include in emails."}</span></div>
+  <p class="why">Testing: assign a current watch shift to a facilities user with a real, authorized email address. Enter a consenting real email on the Google Form and submit fictional work details. Check the Maintenance Staff log, the worker inbox, and the watchstander's inbox. The worker's email contains a one-time checkout link. A checkout triggers a separate watch alert.</p>
+  </div><div class="cols2">`;
+  if (!DEMO) loadMaintenanceTest();
+
   <div class="panel"><h2>Who's in charge</h2>
     <label>Building manager<select id="adMgr">${opt(ppl, st.manager)}</select></label>
     <div class="why">When the manager is away, name an acting manager (CIC). They get full admin rights for those dates and show as in charge.</div>
@@ -802,6 +817,33 @@ function drawAdmin() {
   <div class="panel"><div class="row"><h2>Activity</h2><button class="btn small" id="adAudit">Show recent admin activity</button></div></div>`;
   fillTpl(); mlCount();
 }
+let maintenanceTestLoad = 0;
+async function loadMaintenanceTest() {
+  if (!D || !D.admin || tab !== "admin") return;
+  const status = $("mtStatus"); if (!status) return;
+  status.textContent = "Checking the connected Google Form and watch notification recipients…";
+  const ticket = ++maintenanceTestLoad;
+  try {
+    const r = await API.call("admin.test");
+    if (ticket !== maintenanceTestLoad || !$("mtStatus")) return;
+    if (r.demo) { status.textContent = "Browser demo only. Sign into the connected application to test actual Google Sheets logging and email."; return; }
+    const emailRemaining = r.mailLeft === undefined ? "unknown" : r.mailLeft;
+    const watchEmails = Array.isArray(r.watchRecipients) ? r.watchRecipients : null;
+    const watch = watchEmails ? (watchEmails.length ? "Watch notifications → " + watchEmails.join(", ") : "No valid watch recipient; configure a current watchstander or supervisor email.") : "Watch recipient validation requires the updated backend.";
+    status.textContent = "Mail quota remaining: " + emailRemaining + ". " + watch;
+    if (!r.formUrl || !/^https:\/\/(docs\.google\.com\/forms\/|forms\.gle\/)/.test(r.formUrl)) {
+      status.textContent += " QR Google Form not configured. The Apps Script administrator must run setupWorkerForm() once, then redeploy the backend.";
+      $("mtReady").hidden = true; return;
+    }
+    $("mtReady").hidden = false;
+    $("mtFormUrl").value = r.formUrl;
+    $("mtOpen").href = r.formUrl;
+    $("mtQr").src = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(r.formUrl);
+  } catch (e) {
+    if (ticket === maintenanceTestLoad && $("mtStatus")) status.textContent = "Live check unavailable: " + (e.message || String(e));
+  }
+}
+
 function fillTpl() { const t = TEMPLATES[$("mlTpl").value]; $("mlSubj").value = t.s; $("mlBody").value = t.b.replace("{from}", D.me.name).replace("{url}", D.settings.appUrl || ""); }
 function mlCount() { $("mlCount").textContent = mailTo.size ? `${mailTo.size} recipient${mailTo.size > 1 ? "s" : ""}` : "Pick recipients above"; }
 async function updPerson(id, fields, msg) { const r = await act(() => API.call("person.update", Object.assign({ id }, fields)), msg); if (r) Object.assign(person(id), r); await loadWeek(); }
@@ -812,6 +854,25 @@ $("s-admin").addEventListener("change", e => {
 });
 $("s-admin").addEventListener("click", async e => {
   const t = e.target, d = t.dataset;
+  if (t.id === "mtCheck") { await loadMaintenanceTest(); return; }
+  if (t.id === "mtManual") { openCI(); return; }
+  if (t.id === "mtLog") { tab = "log"; await loadWeek(); return; }
+  if (t.id === "mtCopy") {
+    const url = $("mtFormUrl")?.value;
+    if (url) navigator.clipboard.writeText(url).then(() => toast("Real check-in link copied")).catch(() => toast("Select and copy the link above.", "err"));
+    return;
+  }
+  if (t.id === "mtPhoneSave") {
+    const value = $("mtWatchPhone").value.trim();
+    if (value && !/^\\+?[0-9().\\s-]{7,25}$/.test(value)) { toast("Enter a valid watch phone number.", "err"); return; }
+    const saved = await act(() => API.call("settings.save", { watchPhone:value }));
+    if (!saved) return;
+    if (saved.watchPhone !== value) { toast("The live backend does not support the watch phone setting yet. Update Apps Script first.", "err"); return; }
+    D.settings.watchPhone = saved.watchPhone;
+    $("mtPhoneStatus").textContent = value ? "Saved number: " + value : "No watch telephone configured.";
+    toast("Watch phone saved"); return;
+  }
+
   if (t.id === "adActSave") { await act(() => API.call("settings.save", { manager: $("adMgr").value, acting: { pid: $("adActWho").value, from: $("adActFrom").value, to: $("adActTo").value } }), "Saved"); await loadWeek(); }
   if (t.id === "adActClear") { await act(() => API.call("settings.save", { acting: { pid: "", from: "", to: "" } }), "Acting manager ended"); await loadWeek(); }
   if (t.id === 'adCalLoad') {
