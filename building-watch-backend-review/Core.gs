@@ -34,7 +34,7 @@ var Core = (function () {
 
   function defaults() {
     return {
-      calId: "", calName: "Building Watch", invites: true, remind: 30, watchPhone: "",
+      calId: "", calName: "Building Watch", invites: true, remind: 30,
       manager: "", acting: { pid: "", from: "", to: "" },
       tmpl: DEF_TMPL.slice(), appUrl: "", mailLog: []
     };
@@ -79,7 +79,7 @@ var Core = (function () {
   function pub(p, full) {
     var o = { id: p.id, name: nm(p), role: p.role, watch: p.watch !== false };
     if (full) {
-      o.email = p.email; o.phone = p.phone || ""; o.active = p.active !== false;
+      o.email = p.email; o.active = p.active !== false;
       o.invitedAt = p.invitedAt || ""; o.joinedAt = p.joinedAt || "";
       o.calCount = (p.cals || []).filter(function (c) { return c.on; }).length;
     }
@@ -93,7 +93,7 @@ var Core = (function () {
   function publicSettings(st, admin) {
     var s = st.settings;
     var o = { calName: s.calName, calId: s.calId, invites: s.invites, remind: s.remind, tmpl: s.tmpl,
-      appUrl: s.appUrl, manager: s.manager, acting: s.acting, watchPhone: s.watchPhone || "" };
+      appUrl: s.appUrl, manager: s.manager, acting: s.acting };
     if (admin) o.mailLog = (s.mailLog || []).slice(-10);
     return o;
   }
@@ -126,7 +126,7 @@ var Core = (function () {
       case "profile.save": {
         var name = str(P.name, 80);
         if (!name) throw E("input", "Enter your name.");
-        me.name = name; me.phone = str(P.phone, 40);
+        me.name = name;
         if (!me.joinedAt) { me.joinedAt = H.nowISO(); H.shareCal(st, me.email, true); audit(st, me, "joined", "", H); }
         touch(st, "people");
         return pub(me, true);
@@ -444,11 +444,6 @@ var Core = (function () {
         if (P.invites !== undefined) S.invites = !!P.invites;
         if (P.remind !== undefined) S.remind = +P.remind || 0;
         if (P.appUrl !== undefined) S.appUrl = str(P.appUrl, 300);
-        if (P.watchPhone !== undefined) {
-          var phone = str(P.watchPhone, 30);
-          if (phone && !/^\+?[0-9().\s-]{7,25}$/.test(phone)) throw E("input", "Enter a valid watch telephone number.");
-          S.watchPhone = phone;
-        }
         if (P.manager !== undefined && byId(st.people, P.manager)) S.manager = P.manager;
         if (P.acting !== undefined) {
           var a = P.acting || {};
