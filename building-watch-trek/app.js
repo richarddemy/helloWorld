@@ -1,57 +1,129 @@
+// =====================================================================
+// HOW TO READ THIS FILE (for non-programmers)
+// =====================================================================
+// Lines that start with two slashes, like this one, are notes for people.
+// The browser ignores them completely. Everything else is instructions.
+//
+// This file is the FRONT END: everything you see and click in Building
+// Watch (the tabs, the week grid, the watch bill, the maintenance log, the
+// Admin page, the alert cards). It runs inside each person's web browser
+// or installed app.
+//
+// It never touches the Google Sheets directly. Whenever it needs data or
+// wants to save something, it sends a request to the backend (Code.gs in
+// Google Apps Script) and shows the answer. In demo mode it instead uses
+// a pretend backend stored in this browser, with Star Trek sample data.
+//
+// Common pieces you will see below:
+//   $("name")   finds the item on the page with that id, such as a button.
+//   D           everything loaded for the current week (people, schedule,
+//               maintenance log, settings), as sent by the backend.
+//   tab         which tab is showing ("week", "bill", "log", ...).
+//   toast(...)  shows a short message at the bottom of the screen.
+//   act(...)    runs a request and shows a message if it fails.
+//   `...${x}...`  text with values filled in, used to build page sections.
+// =====================================================================
 /* Building Watch front end. Talks to the Apps Script API, or to an in-browser demo when no API is configured. */
+// Everything in this file is wrapped in one sealed package so its names
+// cannot clash with anything else on the page.
 (function () {
+// "use strict" asks the browser to point out common mistakes.
 "use strict";
+// The settings from config.js: the backend address and sign-in client ID.
 const CFG = window.BW_CONFIG || {};
+// Anything after "?" in the web address, such as ?tab=log or ?demo.
 const qs = new URLSearchParams(location.search);
+// Demo mode: used when no backend is configured, or when ?demo is in the address.
 const DEMO = !CFG.SCRIPT_URL || qs.has("demo");
 /* Time grid. The live backend tells us its grid in "load"; an older backend sends none and
  * still uses the 0730 to 1600 grid, so we fall back to that and never send it longer strings. */
+// The older 0730 to 1600 grid, used if the backend has not been updated.
 const LEGACY_GRID = { start: 450, ns: 17, duty: [1, 17], view: [0, 17], std: [[1, 5], [13, 17]] };
+// The current time grid, and handy copies of its pieces:
+// NS = number of half-hour blocks, START = first block's start (minutes),
+// SLOTS = the start time of every block, ZERO = a day with nobody in.
 let GRID = Core.grid(), NS = GRID.ns, START = GRID.start, SLOTS = [], ZERO = "";
+// setGrid: switch to the grid the backend reports (or the older one).
 function setGrid(g) {
   GRID = g && g.ns ? Object.assign({ view: [0, Math.min(17, g.ns)] }, g) : LEGACY_GRID; NS = GRID.ns; START = GRID.start;
   SLOTS = Array.from({ length: NS }, (_, i) => START + i * 30); ZERO = "0".repeat(NS);
 }
+// Before anything loads: demo mode uses the full grid, live mode starts
+// with the older grid until the backend says otherwise.
 setGrid(DEMO ? Core.grid() : LEGACY_GRID);
+// Whether this viewer turned on "Extended hours" (remembered in this browser).
 let extended = false;
 try { extended = localStorage.getItem("bw-extended") === "1"; } catch (e) {}
+// The stages a maintenance request moves through.
 const STATUSES = Core.STATUSES;
 const $ = id => document.getElementById(id);
+// esc: makes text safe to put on the page, so names containing symbols like
+// < or > can never break the page or run anything.
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// fmt: minutes after midnight to a 24-hour time, such as 450 to "0730".
 const fmt = m => String(Math.floor(m / 60)).padStart(2, "0") + String(m % 60).padStart(2, "0");
+// iso: a date to "YYYY-MM-DD" text.
 const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+// parse: "YYYY-MM-DD" text back to a date.
 const parse = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+// addDays: move a date forward or back by some days.
 const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); };
+// monday: the Monday of the week containing a date.
 const monday = d => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return iso(x); };
+// dayLbl: a short day label, such as "Mon 10/27".
 const dayLbl = s => { const d = parse(s); return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()] + " " + (d.getMonth() + 1) + "/" + d.getDate(); };
+// md: "YYYY-MM-DD" to "10/27".
 const md = s => s ? (+s.slice(5, 7)) + "/" + (+s.slice(8, 10)) : "";
+// span: a watch's time range, such as "0800-1000".
 const span = x => fmt(SLOTS[x.s]) + "-" + fmt(SLOTS[x.e - 1] + 30);
+// isOut: true once a maintenance worker has been checked out.
 const isOut = l => l.out !== "" && l.out != null;
 
+// The Monday of the week on screen (starts with this week).
 let weekStart = monday(new Date());
+// The five weekdays of the week on screen.
 const week = () => [0, 1, 2, 3, 4].map(i => addDays(weekStart, i));
+// The app's working memory:
+//   D        the week's data from the backend
+//   tab      the tab showing (can be set by ?tab= in the address)
+//   myDays   my in-the-building time while I edit it
+//   dirty    true when I have painted time but not saved
+//   busy     my own calendar's busy blocks
+//   sel      the block of time selected on the watch bill
+//   chosen   names picked above the watch bill
+//   mailTo   people picked for a group email
+//   report   the last report pulled on the Reports tab
 let D = null, tab = qs.get("tab") || null, myDays = {}, dirty = false, busy = [], sel = null, chosen = new Set(), mailTo = new Set(), report = null;
 
 /* ---------- small UI helpers ---------- */
+// toast: show a short message; error messages stay up longer.
 function toast(t, kind) { const e = $("toast"); e.textContent = t; e.className = "toast" + (kind === "err" ? " err" : ""); e.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => e.hidden = true, kind === "err" ? 5000 : 2600); }
+// How many requests are in progress (drives the thin progress bar).
 let pending = 0;
 function busyOn() { pending++; $("progress").hidden = false; }
 function busyOff() { pending = Math.max(0, pending - 1); if (!pending) $("progress").hidden = true; }
+// act: run a request; show a success message if given; if it fails show
+// the error, and if the sign-in expired send the person back to sign in.
 async function act(fn, ok) {
   try { const r = await fn(); if (ok) toast(typeof ok === "function" ? ok(r) : ok); return r; }
   catch (e) { if (e.code === "auth") { signOut("Your sign-in expired. Please sign in again."); return; } toast(e.message || "Something went wrong.", "err"); }
 }
+// copy: copy text to the clipboard, or show it in a box to copy by hand.
 function copy(text, msg) {
   const fb = () => openModal("Copy this text", "Select it and copy.", `<textarea style="min-height:160px" id="cpText">${esc(text)}</textarea>`, `<span></span><button class="btn" data-act="cancel">Close</button>`, () => $("cpText").select());
   try { navigator.clipboard.writeText(text).then(() => toast(msg), fb); } catch (e) { fb(); }
 }
+// download: save text as a .csv file (used for reports).
 function download(name, text) {
   try { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: "text/csv" })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); toast("Downloaded " + name); }
   catch (e) { copy(text, "Copied as CSV"); }
 }
 
 /* ---------- Starfleet communications loading screen ---------- */
+// The themed loading screen shown while waiting for the backend.
+// loadDepth counts overlapping waits so the screen only closes at the end.
 let loadDepth = 0, loadTimer = null, loadStep = 0;
+// The messages it cycles through, about every 2 seconds.
 const loadLines = [
   "Opening a channel to Starbase 001…",
   "Contacting Starfleet Command…",
@@ -64,10 +136,12 @@ const loadLines = [
   "Checking for temporal anomalies…",
   "Still awaiting confirmation from Starfleet Command…"
 ];
+// loadMessage: change the loading screen's text.
 function loadMessage(message) {
   const el = $("starfleetLoadText");
   if (el) el.textContent = message;
 }
+// beginLoading: show the loading screen and start cycling messages.
 function beginLoading(message) {
   if (++loadDepth !== 1) return;
   loadStep = 0;
@@ -81,6 +155,7 @@ function beginLoading(message) {
     loadMessage(loadLines[loadStep]);
   }, 2100);
 }
+// endLoading: hide the loading screen once every wait has finished.
 function endLoading() {
   if (!loadDepth) return;
   if (--loadDepth) return;
@@ -91,34 +166,56 @@ function endLoading() {
 }
 
 /* ---------- API ---------- */
+// ---------------------------------------------------------------------
+// TALKING TO THE BACKEND
+// ---------------------------------------------------------------------
+// TOKEN is the Google sign-in pass sent with every request.
 let TOKEN = null;
+// API.call: send one request (an "action" plus details) to the backend.
+// "quiet" requests (the every-15-seconds alert check) show no spinner
+// and no warning messages.
 const API = {
   async call(action, payload = {}, quiet = false) {
+    // In demo mode, the pretend backend answers instead.
     if (DEMO) return Demo.call(action, payload);
     if (!quiet) busyOn();
     try {
+      // Send the request to the Apps Script web address.
       const r = await fetch(CFG.SCRIPT_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ token: TOKEN, action, payload }) });
       if (!r.ok) throw new Error("The server didn't answer (" + r.status + "). Try again.");
       const j = await r.json();
+      // Show any warnings the backend sent back.
       if (!quiet) (j.warn || []).forEach(w => toast(w, "err"));
       if (!j.ok) { const e = new Error(j.error || "Something went wrong."); e.code = j.code; throw e; }
       return j.data;
     } catch (e) {
+      // A network failure becomes a plain "Can't reach the server" message.
       if (e instanceof TypeError) { const x = new Error("Can't reach the server. Check your connection."); throw x; }
       throw e;
     } finally { if (!quiet) busyOff(); }
   }
 };
 
+// ---------------------------------------------------------------------
+// DEMO MODE: a pretend backend in this browser. It runs the same rule book
+// (Core) on sample data saved in this browser, so nothing reaches Google.
+// ---------------------------------------------------------------------
 /* ---------- demo backend: same Core logic, stored in this browser ---------- */
 const Demo = {
+  // key: where the sample data is saved in this browser.
+  // as: whether the demo is acting as the admin or as a member.
   key: "bw-star-trek-demo-v1", as: "admin", st: null,
   emails: { admin: "picard@demo.invalid", member: "data@demo.invalid" },
+  // load: use saved sample data, or create fresh sample data.
   load() { try { const t = localStorage.getItem(this.key); if (t) { this.st = JSON.parse(t); return; } } catch (e) {} this.st = seed(); },
+  // save: keep the sample data in this browser.
   save() { try { const s = Object.assign({}, this.st); delete s._dirty; delete s._warn; localStorage.setItem(this.key, JSON.stringify(s)); } catch (e) {} },
+  // call: answer one request the way the real backend would.
   async call(action, payload) {
     if (!this.st) this.load();
+    // A short pause so the demo feels like a real network.
     await new Promise(r => setTimeout(r, 120));
+    // A few admin actions are faked here because they need real Google services.
     if (action === 'admin.test') return { demo: true };
     if (action === 'admin.calendars') return [
       { id: 'enterprise-test', name: 'USS Enterprise — Fictional Calendar', primary: false },
@@ -140,6 +237,7 @@ const Demo = {
       return { created, failed: 0, demo: true, calendar: this.st.settings.calName };
     }
     if (action === "admin.dataSource") throw Object.assign(new Error("Demo mode has no Google Sheet. This works once the app is set up."), { code: "demo" });
+    // Everything else goes through the shared rule book.
     const st = this.st; st._dirty = {}; st._warn = [];
     try {
       const r = Core.handle(st, this.emails[this.as], action, JSON.parse(JSON.stringify(payload)), DH);
@@ -148,12 +246,16 @@ const Demo = {
     } catch (e) { throw e; }
   }
 };
+// DH: the demo's stand-ins for the backend helpers. They send nothing and
+// return sample busy times instead of reading real calendars.
 const DH = {
   today: () => iso(new Date()), nowMin: () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); }, nowISO: () => new Date().toISOString(),
   syncAvail: () => [], watchCreate: () => "", eventDelete: () => {}, shareCal: () => {}, testCal: () => "Demo calendar",
   sendInvite: () => {}, sendMail: (st, e) => e.length,
   fetchBusy: (st, cals, wk) => [{ d: 0, s: 0, e: 2, t: "PT" }, { d: 1, s: 11, e: 13, t: "Dentist" }, { d: 3, s: 10, e: 15, t: "Ceremony rehearsal" }, { d: 4, s: 2, e: 6, t: "Teaching" }].map(b => ({ date: wk[b.d], s: b.s, e: b.e, t: b.t }))
 };
+// seed: builds the Star Trek sample data: people, who is in when,
+// watches, maintenance requests, worker visits, and crew projects.
 function seed() {
   const wk = week(), t = iso(new Date()), now = new Date().toISOString();
   const P = (email, name, role, watch) => ({ id: Core.uid(), email, name, role, watch, active: true, phone: "", cals: [], invitedAt: now, joinedAt: now });
@@ -163,6 +265,7 @@ function seed() {
   people[0].cals = [{ label: "My Google Calendar", url: "https://demo.invalid/calendar.ics", on: true }];
   const id = n => people.find(p => p.name === n).id;
   const avail = [];
+  // block: mark a person in the building on a day between two hours.
   const block = (n, d, a, b) => { const date = wk[d]; let r = avail.find(x => x.pid === id(n) && x.date === date); if (!r) { r = { pid: id(n), date, slots: ZERO, ev: [] }; avail.push(r); }
     r.slots = r.slots.split("").map((c, i) => (SLOTS[i] >= a * 60 && SLOTS[i] < b * 60) ? "1" : c).join(""); };
   [[0, 8, 12], [1, 8, 15.5], [3, 9, 13]].forEach(r => block("Jean-Luc Picard", ...r));
@@ -196,9 +299,15 @@ function seed() {
     settings: { calId: "", calName: "Enterprise Crew Calendar", invites: true, remind: 30, manager: id("William Riker"), acting: { pid: "", from: "", to: "" }, tmpl: T.slice(), appUrl: location.href.split("?")[0], mailLog: [] } });
 }
 
+// ---------------------------------------------------------------------
+// SIGN-IN
+// ---------------------------------------------------------------------
+// gate: show the sign-in screen (instead of the app) with a message.
 /* ---------- sign-in gate ---------- */
 function gate(html) { $("app").hidden = true; $("gate").hidden = false; $("gateBody").innerHTML = `<div><div class="eyebrow">Facilities</div><h1>Building Watch</h1></div>` + html; }
+// jwt: read the readable middle part of a Google sign-in pass (expiry time).
 function jwt(t) { try { return JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))); } catch (e) { return {}; } }
+// loadGIS: load Google's sign-in button from Google.
 function loadGIS() {
   return new Promise((res, rej) => {
     if (window.google && google.accounts && google.accounts.id) return res();
@@ -207,14 +316,20 @@ function loadGIS() {
     document.head.appendChild(s);
   });
 }
+// startAuth: if this browser already has a valid sign-in pass, use it;
+// otherwise show the "Sign in with Google" button.
 async function startAuth(msg) {
   try { const t = sessionStorage.getItem("bw-token"); if (t && jwt(t).exp * 1000 > Date.now() + 60000) { TOKEN = t; return afterToken(); } } catch (e) {}
+  // Setup check: the app cannot sign anyone in without a client ID.
   if (!CFG.GOOGLE_CLIENT_ID) { gate(`<p class="chip warn">Setup isn't finished: GOOGLE_CLIENT_ID is missing in config.js.</p>`); return; }
+  // An invitation link can carry the email to suggest (?invite=...).
   const hint = qs.get("invite") || "";
   gate(`${msg ? `<p class="chip warn" style="white-space:normal">${esc(msg)}</p>` : ""}
     <p>Sign in with the Google account your admin approved${hint ? `: <b>${esc(hint)}</b>` : ""}.</p>
     <div id="gbtn" style="min-height:44px"></div>
     <p class="why">Building Watch only receives your verified email address from Google. It never sees your password.</p>`);
+  // Show Google's sign-in button. When the person signs in, Google hands back
+  // a pass, which is kept for this browser session only.
   try {
     await loadGIS();
     google.accounts.id.initialize({ client_id: CFG.GOOGLE_CLIENT_ID, auto_select: true, login_hint: hint || undefined, cancel_on_tap_outside: false,
@@ -223,6 +338,8 @@ async function startAuth(msg) {
     google.accounts.id.prompt();
   } catch (e) { gate(`<p class="chip warn">${esc(e.message)}</p>`); }
 }
+// afterToken: ask the backend "who am I?" and act on the answer:
+// not on the list, needs to finish their profile, or straight into the app.
 async function afterToken() {
   gate(`<p class="sub">Checking your access…</p>`);
   beginLoading("Contacting Starfleet Command…");
@@ -236,6 +353,7 @@ async function afterToken() {
     gate(`<p class="chip warn" style="white-space:normal">${esc(e.message)}</p><button class="btn" id="retry">Try again</button>`); $("retry").onclick = afterToken;
   } finally { endLoading(); }
 }
+// profileGate: first-time screen asking for rank, name and phone.
 function profileGate(me) {
   gate(`<h2>Welcome aboard</h2><p class="sub">You're signed in as <b>${esc(me.email)}</b>. Finish your profile to get started.</p>
     <label>Rank and name<input id="pfName" value="${esc(me.name && me.name !== me.email ? me.name : "")}" placeholder="e.g. MU2 Garcia"></label>
@@ -243,6 +361,7 @@ function profileGate(me) {
     <button class="btn primary" id="pfGo">Continue</button>`);
   $("pfGo").onclick = () => act(async () => { await API.call("profile.save", { name: $("pfName").value, phone: $("pfPhone").value }); boot(); });
 }
+// signOut: forget the sign-in pass and stop checking for alerts.
 function signOut(msg) {
   stopWatchAlerts();
   TOKEN = null; try { sessionStorage.removeItem("bw-token"); } catch (e) {}
@@ -250,6 +369,10 @@ function signOut(msg) {
   startAuth(msg);
 }
 
+// ---------------------------------------------------------------------
+// STARTING UP AND LOADING A WEEK
+// ---------------------------------------------------------------------
+// boot: show the app, load this week, and start checking for alerts.
 /* ---------- boot and load ---------- */
 async function boot() {
   beginLoading();
@@ -260,18 +383,23 @@ async function boot() {
     startWatchAlerts();
   } finally { endLoading(); }
 }
+// loadWeek: fetch everything for the week on screen and redraw.
 async function loadWeek(keepTab) {
   beginLoading("Requesting duty rosters from the main computer…");
   try {
   const d = await act(() => API.call("load", { week: week() }));
   if (!d) return;
   D = d;
+  // Use whatever time grid the backend reports.
   setGrid(D.grid);
+  // Copy my own time for each day, so I can edit it before saving.
   myDays = {}; week().forEach(date => { const a = D.avail.find(x => x.pid === D.me.id && x.date === date); myDays[date] = (a ? a.slots : ZERO).split(""); });
   dirty = false; busy = [];
+  // If the requested tab does not exist for this person, show the first one.
   const tabs = tabList().map(x => x[0]);
   if (!tab || !tabs.includes(tab)) tab = tabs[0];
   render();
+  // If I added personal calendars, fetch their busy times to show behind my grid.
   if ((D.me.cals || []).some(c => c.on)) {
     loadMessage("Calibrating long-range calendar sensors…");
     try { busy = await API.call("busy", { week: week() }) || []; if (tab === "week") drawPaint(); }
@@ -279,6 +407,7 @@ async function loadWeek(keepTab) {
   }
   } finally { endLoading(); }
 }
+// tabList: the tabs this person sees. Admins see more.
 function tabList() {
   const t = [["week", "My week"]];
   if (D.admin) t.push(["bill", "Watch bill"]);
@@ -289,12 +418,18 @@ function tabList() {
   t.push(["mine", "My settings"]);
   return t;
 }
+// Quick lookups: a person by code, a name by code, and everyone who stands watch.
 const person = id => D.people.find(p => p.id === id);
 const pname = id => (person(id) || {}).name || "Unknown";
 const watchers = () => D.people.filter(p => p.watch && p.active !== false);
+// followups: checked-out visits that still need something (unfinished work,
+// a follow-up, or a new problem without a request yet).
 function followups() { return D.log.filter(l => isOut(l) && !l.fuClosed && (l.done === "No" || l.done === "Partly" || l.fu || (l.prob && !l.newReq))); }
 
+// render: draw the tab bar, the week heading, who is in charge, then the
+// current tab.
 function render() {
+  // Small number badges on tabs (follow-ups, open requests).
   const b = { log: followups().length, reqs: D.admin ? D.requests.filter(r => r.status === "Open").length : 0 };
   $("tabs").innerHTML = tabList().map(([k, l]) => `<button role="tab" aria-selected="${k === tab}" data-tab="${k}">${l}${b[k] ? `<span class="badge">${b[k]}</span>` : ""}</button>`).join("");
   const wk = week();
@@ -306,24 +441,36 @@ function render() {
   if (DEMO) { $("demoMember").setAttribute("aria-pressed", Demo.as === "member"); $("demoAdmin").setAttribute("aria-pressed", Demo.as === "admin"); }
   ({ week: drawWeek, bill: drawBill, log: drawLog, crew: drawCrew, reqs: drawReqs, reports: drawReports, admin: drawAdmin, mine: drawMine })[tab]();
 }
+// Clicking a tab switches to it (with a warning if My week has unsaved time).
 $("tabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (!b) return; if (dirty && tab === "week" && b.dataset.tab !== "week") toast("You have unsaved time on My week.", "err"); tab = b.dataset.tab; render(); });
+// leaveWeek: before moving to another week, offer to save unsaved time.
 const leaveWeek = fn => () => { if (dirty) { openModal("Unsaved changes", "You painted time you haven't saved.", "", `<span></span><div class="row" style="gap:8px"><button class="btn" data-act="discard">Discard</button><button class="btn primary" data-act="saveThen">Save</button></div>`); pendingNav = fn; return; } fn(); };
 let pendingNav = null;
+// The previous week, next week and this week buttons.
 $("wkPrev").onclick = leaveWeek(() => { weekStart = addDays(weekStart, -7); loadWeek(); });
 $("wkNext").onclick = leaveWeek(() => { weekStart = addDays(weekStart, 7); loadWeek(); });
 $("wkNow").onclick = leaveWeek(() => { weekStart = monday(new Date()); loadWeek(); });
 $("signOut").onclick = () => signOut();
+// Warn before closing the page if there is unsaved time.
 window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
 
+// ---------------------------------------------------------------------
+// POP-UP BOXES ("modals")
+// ---------------------------------------------------------------------
 /* ---------- modal ---------- */
+// openModal: show a pop-up with a title, content and buttons, and put the
+// cursor in its first box.
 function openModal(t, sub, body, acts, after) {
   $("dlgT").textContent = t; $("dlgSub").textContent = sub || ""; $("dlgSub").hidden = !sub;
   $("dlgBody").innerHTML = body; $("dlgAct").innerHTML = acts; $("modal").hidden = false;
   if (after) after(); else { const f = $("dlgBody").querySelector("input:not([type=checkbox]):not([type=radio]),textarea,select"); (f || $("dlgAct").querySelector("button") || $("dlgT")).focus(); }
 }
+// closeModal: hide the pop-up (and clear any watch bill selection).
 function closeModal() { $("modal").hidden = true; if (sel) { sel = null; if (tab === "bill") drawHeat(); } }
+// Clicking outside the pop-up, Cancel, or pressing Escape closes it.
 $("modal").addEventListener("click", e => { if (e.target.id === "modal" || e.target.dataset.act === "cancel") closeModal(); });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("modal").hidden) closeModal(); });
+// The pop-up's buttons call the matching save function by name.
 $("dlgAct").addEventListener("click", e => {
   const a = e.target.dataset.act; if (!a) return;
   ({ saveReq, saveWatch, saveCI, saveCO,
@@ -331,10 +478,19 @@ $("dlgAct").addEventListener("click", e => {
     saveThen: async () => { closeModal(); await saveMyWeek(); const f = pendingNav; pendingNav = null; f && f(); } })[a]?.();
 });
 
+// ---------------------------------------------------------------------
+// DUTY DAY AND EXTENDED HOURS
+// The grids normally show 0730 to 1600. "Extended hours" shows up to 2400.
+// If anything is scheduled after 1600 that week, those hours stay shown.
+// ---------------------------------------------------------------------
 /* ---------- Duty day and extended hours ---------- */
+// canExtend: whether the backend's grid goes beyond the normal view.
 const canExtend = () => GRID.ns > GRID.view[1] || GRID.view[0] > 0;
+// inDuty: whether a block falls in the 0800 to 1600 duty day.
 const inDuty = i => i >= GRID.duty[0] && i < GRID.duty[1];
+// inView: whether a block is in the normal 0730 to 1600 view.
 const inView = i => i >= GRID.view[0] && i < GRID.view[1];
+// inStd: whether a block falls in the usual watch windows.
 const inStd = i => GRID.std.some(([a, b]) => i >= a && i < b);
 // Time scheduled after the default view this week stays visible. "mine" is My week (your own
 // time only); "all" is the watch bill (everyone's time).
@@ -344,9 +500,13 @@ function outsideThisWeek(scope) {
     (!mine && D.avail.some(a => wk.includes(a.date) && a.slots.split("").some((c, i) => c === "1" && !inView(i)))) ||
     (mine && Object.values(myDays).some(arr => arr.some((c, i) => c === "1" && !inView(i))));
 }
+// showAll: whether to show the extended hours for this grid.
 const showAll = scope => canExtend() && (extended || outsideThisWeek(scope));
+// viewIdx: the blocks to draw, normal view or all of them.
 const viewIdx = scope => SLOTS.map((_, i) => i).filter(i => showAll(scope) || inView(i));
+// rowCls: how to style a row (shaded outside the duty day, marked in usual watch windows).
 const rowCls = i => (inDuty(i) ? "" : "off") + (inStd(i) ? " std" : "");
+// drawHoursUI: update the Extended hours button and the note under the grid.
 function drawHoursUI(scope) {
   const sec = scope === "mine" ? "#s-week" : "#s-bill", all = showAll(scope);
   const forced = canExtend() && !extended && outsideThisWeek(scope);
@@ -363,17 +523,24 @@ function drawHoursUI(scope) {
     n.hidden = !all;
   });
 }
+// Pressing either Extended hours button switches the view and remembers it.
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-hrs]"); if (!b) return;
   extended = !extended; try { localStorage.setItem("bw-extended", extended ? "1" : "0"); } catch (err) {}
   if (tab === "week") drawPaint(); if (tab === "bill") drawHeat();
 });
 
+// ---------------------------------------------------------------------
+// MY WEEK: paint the times you will be in the building.
+// ---------------------------------------------------------------------
 /* ---------- My week ---------- */
+// mineAt: whether I marked myself in the building at that block.
 const mineAt = (date, i) => myDays[date] && myDays[date][i] === "1";
+// drawPaint: draw my week grid: my time, my watches, and my busy times.
 function drawPaint() {
   const wk = week(), t = D.today, hasCal = (D.me.cals || []).some(c => c.on);
   let html = "<tr><th class='t'></th>" + wk.map(d => `<th class="${d === t ? "today" : ""}">${dayLbl(d)}</th>`).join("") + "</tr>";
+  // One row per half hour, one cell per day.
   viewIdx("mine").forEach(i => {
     const m = SLOTS[i];
     html += `<tr class="${rowCls(i)}"><th class='t'>` + (m % 60 ? "" : fmt(m)) + "</th>";
@@ -384,11 +551,13 @@ function drawPaint() {
     });
     html += "</tr>";
   });
+  // Put the finished grid on the page.
   $("paintGrid").innerHTML = html;
   drawHoursUI("mine");
   $("dirtyNote").hidden = !dirty;
   $("calNote").textContent = hasCal ? `Showing your own calendar so you can see what you already have. Only you see these titles.` : `Tip: add your own calendar in My settings to see what you already have while you paint.`;
 }
+// drawWeek: my grid plus the list of my watches this week.
 function drawWeek() {
   drawPaint();
   const list = D.watches.filter(x => x.pid === D.me.id);
@@ -399,12 +568,19 @@ function drawWeek() {
       </div>`;
   }).join("") : "<div class='empty'>No watches this week.</div>";
 }
+// ---------------------------------------------------------------------
+// PAINTING: drag down a day to add time; drag over painted time to erase.
+// On phones, a sideways swipe scrolls instead of painting.
+// ---------------------------------------------------------------------
 let painting = null; const pg = $("paintGrid");
+// cellAt: the grid cell under the finger or mouse.
 const cellAt = e => { const el = document.elementFromPoint(e.clientX, e.clientY); return el && el.closest ? el.closest("#paintGrid td[data-k]") : null; };
+// apply: paint or erase one cell.
 function apply(el) { if (!el) return; const [date, i] = el.dataset.k.split("|"); myDays[date][+i] = painting === "add" ? "1" : "0"; el.classList.toggle("on", painting === "add"); dirty = true; }
 // Touch: horizontal one-finger motion scrolls the grid; vertical motion paints availability.
 // A tap toggles one cell. Two-finger gestures remain available for browser pinch zoom.
 let paintTouch = null;
+// Finger or mouse goes down on a cell.
 pg.addEventListener("pointerdown", e => {
   const el = cellAt(e); if (!el || (e.pointerType === "mouse" && e.button !== 0)) return;
   if (e.pointerType === "touch") {
@@ -417,6 +593,7 @@ pg.addEventListener("pointerdown", e => {
   painting = mineAt(date, +i) ? "del" : "add";
   pg.setPointerCapture(e.pointerId); apply(el);
 });
+// Finger or mouse moves: keep painting, or decide between scrolling and painting.
 pg.addEventListener("pointermove", e => {
   if (paintTouch && e.pointerId === paintTouch.id) {
     const t = paintTouch, dx = e.clientX - t.x, dy = e.clientY - t.y;
@@ -432,6 +609,7 @@ pg.addEventListener("pointermove", e => {
   }
   if (painting) apply(cellAt(e));
 });
+// Finger or mouse lifts: a simple tap toggles one cell.
 pg.addEventListener("pointerup", e => {
   if (paintTouch && e.pointerId === paintTouch.id) {
     if (paintTouch.mode === "pending") {
@@ -446,6 +624,7 @@ pg.addEventListener("pointercancel", () => { paintTouch = null; if (painting) { 
 // Clear and copy act only on the hours on screen, so hidden evening time is never wiped by surprise.
 $("clearMe").onclick = () => { const v = viewIdx("mine"); week().forEach(d => v.forEach(i => myDays[d][i] = "0")); dirty = true; drawPaint(); };
 $("copyMon").onclick = () => { const v = viewIdx("mine"), mon = myDays[week()[0]]; week().slice(1).forEach(d => v.forEach(i => myDays[d][i] = mon[i])); dirty = true; drawPaint(); toast("Monday copied to the whole week. Save when ready."); };
+// saveMyWeek: send my week to the backend, then reload.
 async function saveMyWeek() {
   const days = {}; week().forEach(d => days[d] = myDays[d].join(""));
   const r = await act(() => API.call("avail.save", { days }), "Saved to the calendar");
@@ -453,14 +632,23 @@ async function saveMyWeek() {
 }
 $("saveMe").onclick = saveMyWeek;
 
+// ---------------------------------------------------------------------
+// WATCH BILL (admins): see who is in the building and assign watches.
+// ---------------------------------------------------------------------
+// slotsOf: a person's in-the-building string for a day.
 /* ---------- Watch bill ---------- */
 const slotsOf = (pid, date) => { const a = D.avail.find(x => x.pid === pid && x.date === date); return a ? a.slots : ZERO; };
+// whoIn: who is in the building at that block.
 const whoIn = (date, i) => watchers().filter(p => slotsOf(p.id, date)[i] === "1");
+// standers: who is on watch at that block.
 const standers = (date, i) => [...new Set(D.watches.filter(x => x.date === date && i >= x.s && i < x.e).map(x => x.pid))];
+// drawPick: the row of name buttons above the chart.
 function drawPick() {
   $("pickRow").innerHTML = `<button class="pk" aria-pressed="${!chosen.size}" data-n="">Suggest for me</button>` + watchers().map(p => `<button class="pk" aria-pressed="${chosen.has(p.id)}" data-n="${p.id}">${esc(p.name)}</button>`).join("");
 }
 $("pickRow").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; const n = b.dataset.n; if (!n) chosen.clear(); else chosen.has(n) ? chosen.delete(n) : chosen.add(n); drawPick(); });
+// drawHeat: draw the "who's in the building" chart. Darker cells mean more
+// people; dashed cells mean nobody; a stripe means someone is on watch.
 function drawHeat() {
   const wk = week(), t = D.today;
   let html = "<tr><th class='t'></th>" + wk.map(d => `<th class="${d === t ? "today" : ""}">${dayLbl(d)}</th>`).join("") + "</tr>";
@@ -477,12 +665,14 @@ function drawHeat() {
   $("heatGrid").innerHTML = html;
   drawHoursUI("all");
 }
+// drawBill: the chart plus the list of this week's watches.
 function drawBill() {
   drawPick(); drawHeat();
   $("inviteNote").textContent = D.settings.invites ? "Each person on watch gets a private calendar invitation." : "Calendar invitations are turned off in Admin.";
   const T = D.settings.tmpl.length;
   $("allAsg").innerHTML = D.watches.length ? D.watches.map(x => `<li><span><b>${esc(pname(x.pid))}</b></span><span class="mono">${dayLbl(x.date)} ${span(x)} · ${D.settings.tmpl.filter(t => x.checks[t]).length}/${T}</span></li>`).join("") : "<li class='empty'>No watches this week.</li>";
 }
+// Dragging on the chart selects a block of time on one day.
 let drag = null; const hg = $("heatGrid");
 const hcell = e => { const el = document.elementFromPoint(e.clientX, e.clientY); return el && el.closest ? el.closest("#heatGrid td") : null; };
 let heatTouch = null;
@@ -516,14 +706,20 @@ hg.addEventListener("pointerup", e => {
   }
 });
 hg.addEventListener("pointercancel", () => { heatTouch = null; drag = null; });
+// When the drag ends, open the assign box.
 const hend = () => { if (!drag) return; drag = null; openAssign(); };
 hg.addEventListener("pointerup", hend); hg.addEventListener("pointercancel", hend);
 hg.addEventListener("keydown", e => { if (e.key === "Enter") { const td = e.target.closest("td"); if (td) { const i = +td.dataset.i; sel = { d: +td.dataset.d, s: i, e: i + 1 }; drawHeat(); openAssign(); } } });
+// openAssign: the box for choosing who stands the selected watch. It
+// suggests people who are in the whole time and have had fewer watches
+// this month.
 function openAssign() {
   const { d, s, e } = sel, n = e - s, date = week()[d];
   const w = whoIn(date, s).map(p => p.name), st = standers(date, s).map(pname);
   $("slotInfo").innerHTML = `<b>${dayLbl(date)} ${fmt(SLOTS[s])}</b>: ${w.length ? esc(w.join(", ")) : "<span style='color:var(--warn)'>nobody in the building</span>"}<br>Watch: ${st.length ? "<b>" + esc(st.join(", ")) + "</b>" : "<span style='color:var(--warn)'>not assigned</span>"}`;
   const onNow = new Set(D.watches.filter(x => x.date === date && x.s < e && x.e > s).map(x => x.pid));
+  // Rank each person: in the whole time scores highest; many watches this
+  // month lowers the score; names picked above the chart rise to the top.
   const rows = watchers().map(p => { let c = 0; for (let i = s; i < e; i++) if (slotsOf(p.id, date)[i] === "1") c++;
     return { p, c, score: (c === n ? 100 : c / n * 40) - (D.monthCounts[p.id] || 0) * 6 + (onNow.has(p.id) ? 200 : 0) + (chosen.has(p.id) ? 300 : 0) }; })
     .filter(r => r.c > 0 || onNow.has(r.p.id) || chosen.has(r.p.id)).sort((a, b) => b.score - a.score);
@@ -542,6 +738,7 @@ $("dlgBody").addEventListener("change", e => {
   if (e.target.id === "ciReq" && e.target.value && !$("ciTask").value) { const r = D.requests.find(x => x.id === e.target.value); if (r) $("ciTask").value = r.issue; }
 });
 $("dlgBody").addEventListener("input", e => { if (e.target.id === "coProb") $("coReqBox").hidden = !e.target.value.trim(); });
+// saveWatch: send the chosen people for this watch to the backend.
 async function saveWatch() {
   const { d, s, e } = sel, pids = [...$("dlgBody").querySelectorAll(".cand input:checked")].map(i => i.value);
   closeModal();
@@ -549,13 +746,20 @@ async function saveWatch() {
   await loadWeek();
 }
 
+// ---------------------------------------------------------------------
+// MAINTENANCE STAFF LOG: workers in the building, follow-ups, and history.
+// ---------------------------------------------------------------------
 /* ---------- Maintenance log ---------- */
 const reqOf = id => D.requests.find(x => x.id === id);
+// helpAcked: whether someone has already said they are responding.
 const helpAcked = l => !!(l.helpAt && l.helpAckAt && l.helpAckAt >= l.helpAt);
 // Tells the Chat space (in the same thread) and everyone in the building who is responding.
+// closeHelpCards: close any open "needs assistance" cards for this worker.
 function closeHelpCards(logId) {
   document.querySelectorAll(".bwWatchAlert[data-kind='assistance']").forEach(c => { if (c.dataset.log === logId) c.remove(); });
 }
+// ackHelp: the "I'm responding" button. Tells the backend, which replies in
+// the Chat pager thread and tells everyone else in the building.
 async function ackHelp(id) {
   const r = await act(() => API.call("log.ack", { id }));
   if (!r) return false;
@@ -564,6 +768,8 @@ async function ackHelp(id) {
   await loadWeek(); return true;
 }
 const reqShort = id => { const r = reqOf(id); return r ? (r.wo || "Request") + " · " + r.loc : ""; };
+// drawLog: draw the three lists: workers in the building now (with any
+// assistance request), visits needing follow-up, and the full log.
 function drawLog() {
   const open = D.log.filter(l => !isOut(l)); $("nowCount").textContent = open.length || "";
   $("nowList").innerHTML = open.length ? open.map(l => `<li><div class="item"><b>${esc(l.worker)}</b><span class="why">${esc(l.shop)}${l.req ? " · " + esc(reqShort(l.req)) : ""}</span><span>${esc(l.task)}</span>${l.helpAt ? `<span class="chip warn">Assistance requested</span><span><b>Location: ${esc(l.helpLocation || "Not specified")}</b> · ${esc(l.helpMessage || "I need help")}</span>${helpAcked(l) ? `<span class="chip ok">${esc(l.helpAckBy)} is responding</span>` : `<button class="btn small primary" data-ack="${l.id}">I'm responding</button>`}` : ""}<span class="mono">In ${fmt(+l.in)}${l.date !== D.today ? " on " + md(l.date) : ""} · logged by ${esc(l.by)}</span></div><button class="btn small primary" data-co="${l.id}">Check out</button></li>`).join("") : "<li class='empty'>No workers in the building.</li>";
@@ -581,6 +787,7 @@ function drawLog() {
     ${l.watchDepartureAlertTo ? '<div><b>Departure sent:</b> ' + esc(l.watchDepartureAlertTo) + '</div>' : ""}
     </td>` : ""}</tr>`).join("") : `<tr><td colspan="${D.admin ? 9 : 8}" class="empty">No entries yet.</td></tr>`);
 }
+// openCI: the "Check in a worker" box.
 function openCI() {
   const open = D.requests.filter(r => r.status !== "Closed");
   const shops = [...new Set(D.log.map(l => l.shop).filter(Boolean))];
@@ -594,6 +801,7 @@ function openCI() {
     <label class="full">What are they here to do?<input id="ciTask" placeholder="e.g. Replace thermostat, Rm 210"></label></div>`,
     `<span class="why">Logged by ${esc(D.me.name)}</span><div class="row" style="gap:8px"><button class="btn" data-act="cancel">Cancel</button><button class="btn primary" data-act="saveCI">Check in</button></div>`);
 }
+// saveCI: send a check-in to the backend.
 async function saveCI() {
   const worker = $("ciName").value.trim(); if (!worker) { $("ciName").focus(); toast("Enter the worker's name", "err"); return; }
   const p = { worker, shop: $('ciShop').value, req: $('ciReq').value, task: $('ciTask').value,
@@ -601,6 +809,7 @@ async function saveCI() {
   closeModal();
   await act(() => API.call("log.in", p), `${worker} checked in`); await loadWeek();
 }
+// openCO: the "Check out" box (finished? follow-up? new problems?).
 let coId = null;
 function openCO(id) {
   coId = id; const l = D.log.find(x => x.id === id);
@@ -614,11 +823,14 @@ function openCO(id) {
     ${l.req ? `<div class="why">Linked request: ${esc(reqShort(l.req))}. Finished with no follow-up closes it; otherwise it stays in progress.</div>` : ""}`,
     `<span></span><div class="row" style="gap:8px"><button class="btn" data-act="cancel">Cancel</button><button class="btn primary" data-act="saveCO">Check out</button></div>`);
 }
+// saveCO: send a check-out to the backend.
 async function saveCO() {
   const p = { id: coId, done: document.querySelector("input[name=coDone]:checked").value, fu: $("coFu").value, ret: $("coRet").value, prob: $("coProb").value, loc: $("coLoc").value, make: $("coMake").checked };
   closeModal();
   await act(() => API.call("log.out", p), r => `${r.worker} checked out${r.newReq ? ". New request opened." : ""}`); await loadWeek();
 }
+// Buttons in the maintenance log: check in, refresh, check out,
+// I'm responding, resolved, and open a request.
 $("s-log").addEventListener("click", async e => {
   const t = e.target.dataset;
   if (t.lg === "in") openCI();
@@ -629,7 +841,11 @@ $("s-log").addEventListener("click", async e => {
   if (t.mk) { await act(() => API.call("log.makeReq", { id: t.mk }), "Service request opened"); await loadWeek(); }
 });
 
+// ---------------------------------------------------------------------
+// WATCH CHECKLIST: the duties for each watch.
+// ---------------------------------------------------------------------
 /* ---------- Checklist ---------- */
+// drawCheck: the duty list and how complete each watch is.
 function drawCheck() {
   const T = D.settings.tmpl;
   $("tmplList").innerHTML = T.map((t, k) => `<li><span>${esc(t)}</span><button class="btn small" data-del="${k}">Remove</button></li>`).join("") || "<li class='empty'>No duties yet.</li>";
@@ -638,13 +854,18 @@ function drawCheck() {
     return `<div class="item" style="gap:5px"><div class="row"><span><b>${esc(pname(w.pid))}</b> <span class="mono">${dayLbl(w.date)} ${span(w)}</span></span><span class="chip ${n === T.length ? "ok" : past ? "warn" : ""}">${n}/${T.length}${past && n < T.length ? " missed" : ""}</span></div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
   }).join("") : "<div class='empty'>No watches this week.</div>";
 }
+// saveTmpl: save the duty list.
 async function saveTmpl(T) { const r = await act(() => API.call("tmpl.save", { tmpl: T }), "Duties updated"); if (r) { D.settings.tmpl = r; drawCheck(); } }
 $("tmplList").addEventListener("click", e => { const k = e.target.dataset.del; if (k != null) { const T = D.settings.tmpl.slice(); T.splice(+k, 1); saveTmpl(T); } });
 const addDuty = () => { const v = $("tmplNew").value.trim(); if (!v) return; $("tmplNew").value = ""; saveTmpl(D.settings.tmpl.concat([v])); };
 $("tmplAdd").onclick = addDuty; $("tmplNew").addEventListener("keydown", e => { if (e.key === "Enter") addDuty(); });
 
+// ---------------------------------------------------------------------
+// FACILITIES TEAM ASSIGNMENTS (crew projects, separate from contractors)
+// ---------------------------------------------------------------------
 /* ---------- Crew assignments (distinct from contractor maintenance) ---------- */
 function crewName(id) { return (D.people.find(p => p.id === id) || {}).name || "Crew member"; }
+// drawCrew: the project cards. Admins see all; members see their own.
 function drawCrew() {
   const root = $("s-crew"), assignments = D.crewAssignments || [], admin = D.admin;
   const sorted = [...assignments].sort((a,b) => (a.status === "Approved") - (b.status === "Approved") || (a.dueDate || "9999").localeCompare(b.dueDate || "9999"));
@@ -670,6 +891,7 @@ function drawCrew() {
     </div>`;
   }).join("") : '<div class="empty">No crew assignments yet.</div>'}</div>`;
 }
+// crewForm: the box for creating or editing a project.
 function crewForm(a) {
   const people = D.people.filter(p => p.active !== false);
   openModal(a ? "Edit crew assignment" : "New crew assignment", "Assign one or more people. Crew work is separate from maintenance contractors.",
@@ -689,6 +911,7 @@ function crewForm(a) {
     if (result) { closeModal(); await loadWeek(); }
   };
 }
+// Project buttons: new, edit, add progress, submit, approve, return.
 $("s-crew").addEventListener("click", async e => {
   const btn = e.target.closest("[data-crew]"); if (!btn) return;
   const action = btn.dataset.crew, id = btn.closest("[data-crew-id]")?.dataset.crewId;
@@ -707,7 +930,11 @@ $("s-crew").addEventListener("click", async e => {
   }
 });
 
+// ---------------------------------------------------------------------
+// MAINTENANCE (SERVICE) REQUESTS
+// ---------------------------------------------------------------------
 /* ---------- Service requests ---------- */
+// newReqModal: the "New service request" box.
 function newReqModal() {
   openModal("New service request", "", `<div class="form"><label class="full">Location<input id="rqLoc" placeholder="Deck, room, or area"></label>
     <label class="full">What's wrong?<textarea id="rqIssue" placeholder="Describe the problem"></textarea></label>
@@ -716,12 +943,16 @@ function newReqModal() {
     `<span class="why">From ${esc(D.me.name)}</span><div class="row" style="gap:8px"><button class="btn" data-act="cancel">Cancel</button><button class="btn primary" data-act="saveReq">Submit</button></div>`);
 }
 $("quickReq").onclick = newReqModal;
+// saveReq: send a new request.
 async function saveReq() {
   const issue = $("rqIssue").value.trim(); if (!issue) { $("rqIssue").focus(); toast("Describe the problem first", "err"); return; }
   const p = { loc: $("rqLoc").value, issue, pri: $("rqPri").value }; closeModal();
   await act(() => API.call("req.new", p), "Service request submitted"); await loadWeek();
 }
+// reqText: a request formatted for pasting into the official trouble call
+// system or an email.
 const reqText = r => `SERVICE REQUEST\nLocation: ${r.loc}\nProblem: ${r.issue}\nPriority: ${r.pri}\nReported by: ${r.by}, ${r.date}\nPOC: ${D.inCharge || D.me.name}`;
+// drawReqs: the requests table. Admins can change status and work order numbers.
 function drawReqs() {
   const a = D.admin, rs = [...D.requests].sort((x, y) => (x.status === "Closed") - (y.status === "Closed") || (x.date < y.date ? 1 : -1));
   const counts = STATUSES.map(s => `<span class="chip ${s === "Open" ? "warn" : s === "Closed" ? "ok" : ""}">${s}: ${D.requests.filter(r => r.status === s).length}</span>`).join(" ");
@@ -733,6 +964,7 @@ function drawReqs() {
    ${a ? `<td><button class="btn small" data-cp="${r.id}">Copy for trouble call</button></td>` : ""}</tr>`).join("") : `<tr><td colspan="8" class="empty">No requests yet.</td></tr>`}</table></div>
   ${a ? `<div class="why">"Copy for trouble call" copies a formatted request to paste into the official Public Works system or an email. Record their work order number here to track it.</div>` : ""}`;
 }
+// Copy buttons, and saving status or work order changes.
 $("s-reqs").addEventListener("click", e => { if (e.target.dataset.q === "new") newReqModal(); const c = e.target.dataset.cp; if (c) copy(reqText(reqOf(c)), "Copied. Paste it into the trouble call system."); });
 $("s-reqs").addEventListener("change", async e => {
   const st = e.target.dataset.st, wo = e.target.dataset.wo;
@@ -740,7 +972,11 @@ $("s-reqs").addEventListener("change", async e => {
   if (wo) { const r = await act(() => API.call("req.update", { id: wo, wo: e.target.value }), "Work order saved"); if (r) Object.assign(reqOf(wo), r); }
 });
 
+// ---------------------------------------------------------------------
+// REPORTS (admins): pull a date range and export it.
+// ---------------------------------------------------------------------
 /* ---------- Reports ---------- */
+// drawReports: the manpower table for the chosen dates.
 function drawReports() {
   if (!$("rFrom").value) { $("rFrom").value = week()[0]; $("rTo").value = week()[4]; }
   if (!report) { $("repTbl").innerHTML = `<tr><td class="empty">Pick dates and run the report.</td></tr>`; $("repBtns").hidden = true; return; }
@@ -750,6 +986,8 @@ function drawReports() {
     `<tr>${cols.map((c, k) => `<td class="${k ? "n" : ""}"><b>${k === 0 ? "Total" : (c === "Checklist" ? "" : +tot(c).toFixed(1))}</b></td>`).join("")}</tr>`;
   $("repBtns").hidden = false;
 }
+// manpower: per person: hours in the building, watches, watch hours,
+// checklist completion, workers logged, and requests made.
 function manpower() {
   const R = report;
   return R.people.filter(p => p.active || R.avail.some(a => a.pid === p.id) || R.watches.some(w => w.pid === p.id)).map(p => {
@@ -759,17 +997,21 @@ function manpower() {
     return { Name: p.name, "Hrs in building": hrs, Watches: ws.length, "Watch hrs": wh, Checklist: ct ? `${Math.min(cd, ct)}/${ct}` : "", "Workers logged": R.log.filter(l => l.by === p.name).length, Requests: R.requests.filter(r => r.byId === p.id).length };
   });
 }
+// Run the report for the chosen dates.
 $("rRun").onclick = async () => {
   const from = $("rFrom").value, to = $("rTo").value; if (!from || !to || from > to) { toast("Pick a valid date range", "err"); return; }
   const r = await act(() => API.call("range", { from, to })); if (r) { report = r; drawReports(); }
 };
+// csv: turn rows into spreadsheet (CSV) text.
 const csv = rows => { const cols = Object.keys(rows[0] || {}); return [cols.join(",")].concat(rows.map(r => cols.map(c => `"${String(r[c] ?? "").replace(/"/g, '""')}"`).join(","))).join("\n"); };
+// dataset: the rows for each export (manpower, maintenance log, requests).
 function dataset(k) {
   const R = report;
   if (k === "man") return manpower();
   if (k === "log") return R.log.map(l => ({ Date: l.date, Worker: l.worker, "Shop or company": l.shop, Job: l.task, In: fmt(+l.in), Out: isOut(l) ? fmt(+l.out) : "", Finished: l.done, "Follow-up": l.fu, Returning: l.ret, "New problems": l.prob, "Logged by": l.by }));
   return R.requests.map(r => ({ Date: r.date, Location: r.loc, Problem: r.issue, Priority: r.pri, By: r.by, Status: r.status, "Work order": r.wo }));
 }
+// Download and copy buttons.
 $("s-reports").addEventListener("click", e => {
   const k = e.target.dataset.csv, c = e.target.dataset.copy; if (!k && !c) return;
   if (!report) { toast("Run the report first", "err"); return; }
@@ -777,10 +1019,16 @@ $("s-reports").addEventListener("click", e => {
   if (c) { const rows = dataset("man"); copy([Object.keys(rows[0]).join("\t")].concat(rows.map(r => Object.values(r).join("\t"))).join("\n"), "Copied. Paste into Excel or Sheets."); }
 });
 
+// ---------------------------------------------------------------------
+// MY SETTINGS: personal calendars, the main calendar, and my profile.
+// ---------------------------------------------------------------------
 /* ---------- My settings ---------- */
+// subLink: a link that adds the main calendar to Google Calendar.
 const subLink = () => `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(D.settings.calId || "")}`;
+// copyBox: a read-only box with a Copy button.
 const copyBox = (id, v) => `<div class="copybox"><input id="${id}" value="${esc(v)}" readonly aria-label="Link"><button class="btn small" data-cpv="${id}">Copy</button></div>`;
 document.addEventListener("click", e => { const id = e.target.dataset && e.target.dataset.cpv; if (id) copy($(id).value, "Copied"); });
+// drawMine: draw the My settings tab.
 function drawMine() {
   const me = D.me, cals = me.cals || [];
   $("s-mine").innerHTML = `<div class="panel"><h2>My calendars</h2>
@@ -798,21 +1046,30 @@ function drawMine() {
     <label>Rank and name<input id="myName" value="${esc(me.name)}"></label><label>Phone<input id="myPhone" value="${esc(me.phone)}"></label>
     <button class="btn small primary" id="mySave" style="align-self:flex-start">Save profile</button></div></div>`;
 }
+// saveCals: save my personal calendar links and refresh my busy times.
 async function saveCals(cals, msg) { const r = await act(() => API.call("cals.save", { cals }), msg); if (r) { D.me.cals = r; drawMine(); busy = []; if (r.some(c => c.on)) API.call("busy", { week: week() }).then(b => busy = b || []).catch(() => {}); } }
+// My settings buttons: add or remove a calendar, save my profile.
 $("s-mine").addEventListener("click", async e => {
   const t = e.target, cals = (D.me.cals || []).slice();
   if (t.id === "mcAdd") { const url = $("mcUrl").value.trim(); if (!url) { $("mcUrl").focus(); toast("Paste the calendar address", "err"); return; } cals.push({ label: $("mcLabel").value.trim() || "My calendar", url, on: true }); saveCals(cals, "Calendar added"); }
   if (t.dataset.mdel != null) { cals.splice(+t.dataset.mdel, 1); saveCals(cals, "Calendar removed"); }
   if (t.id === "mySave") { const r = await act(() => API.call("profile.save", { name: $("myName").value, phone: $("myPhone").value }), "Profile saved"); if (r) { Object.assign(D.me, r); render(); } }
 });
+// Ticking a calendar on or off.
 $("s-mine").addEventListener("change", e => { const k = e.target.dataset.mcal; if (k != null) { const cals = D.me.cals.slice(); cals[+k] = Object.assign({}, cals[+k], { on: e.target.checked }); saveCals(cals, e.target.checked ? "Calendar shown" : "Calendar hidden"); } });
 
+// ---------------------------------------------------------------------
+// ADMIN
+// ---------------------------------------------------------------------
 /* ---------- Admin ---------- */
+// The calendars the admin may publish to (loaded on request).
 let CAL_CHOICES = null;
+// Ready-made group email templates.
 const TEMPLATES = {
   avail: { s: "Building Watch: enter your time for next week", b: "Shipmates,\n\nPlease paint the times you'll be in the building next week by Friday COB.\n\nOpen Building Watch, go to My week, drag over your hours, and press Save.\n{url}\n\nV/r,\n{from}" },
   watch: { s: "Watch bill posted", b: "Shipmates,\n\nNext week's building watch bill is posted. Check your calendar for invitations and accept them.\n{url}\n\nV/r,\n{from}" },
   custom: { s: "", b: "" } };
+// opt: builds the choices for a drop-down list.
 const opt = (list, v) => list.map(([val, lbl]) => `<option value="${esc(val)}" ${val === v ? "selected" : ""}>${esc(lbl)}</option>`).join("");
 // Chat pager: a ping in a Google Chat space when a worker asks for help. The webhook URL is a
 // password, so it is never shown again after saving; only the space it points to is listed.
@@ -825,6 +1082,9 @@ function chatPagerPanel() {
   <div class="row start"><button class="btn" id="cpSave">Save webhook</button><button class="btn" id="cpTest" ${cp && cp.configured ? "" : "disabled"}>Send test ping</button>${cp && cp.configured ? `<button class="btn" id="cpClear">Disconnect</button>` : ""}<span id="cpStatus" class="why">${status}</span></div>
   <div class="why">${cp ? (ready.length ? "Can be @mentioned: " + esc(ready.join(", ")) + ". " : "") + (not.length ? "Named in plain text until they sign in once: " + esc(not.join(", ")) + "." : "") : ""}</div>`;
 }
+// drawAdmin: draw the whole Admin tab: maintenance check-in test, watch
+// phone, Chat pager, who is in charge, main calendar, data storage,
+// people and roles, group email, and recent activity.
 function drawAdmin() {
   const st = D.settings, a = st.acting || {}, active = D.people.filter(p => p.active !== false), ppl = active.map(p => [p.id, p.name]);
   $("s-admin").innerHTML = `<div class="panel" id="maintenanceTestPanel">
@@ -902,6 +1162,8 @@ function drawAdmin() {
   if (!DEMO) loadMaintenanceTest();
 }
 let maintenanceTestLoad = 0;
+// loadMaintenanceTest: checks the live connection and, if the QR check-in
+// form exists, shows its link and a QR code for printing.
 async function loadMaintenanceTest() {
   if (!D || !D.admin || tab !== "admin") return;
   const status = $("mtStatus"); if (!status) return;
@@ -930,14 +1192,19 @@ async function loadMaintenanceTest() {
   }
 }
 
+// fillTpl: fill the group email from the chosen template.
 function fillTpl() { const t = TEMPLATES[$("mlTpl").value]; $("mlSubj").value = t.s; $("mlBody").value = t.b.replace("{from}", D.me.name).replace("{url}", D.settings.appUrl || ""); }
+// mlCount: how many people the group email will go to.
 function mlCount() { $("mlCount").textContent = mailTo.size ? `${mailTo.size} recipient${mailTo.size > 1 ? "s" : ""}` : "Pick recipients above"; }
+// updPerson: save a change to one person, then reload.
 async function updPerson(id, fields, msg) { const r = await act(() => API.call("person.update", Object.assign({ id }, fields)), msg); if (r) Object.assign(person(id), r); await loadWeek(); }
+// Changes in the Admin tab (template choice, people table edits).
 $("s-admin").addEventListener("change", e => {
   const t = e.target, d = t.dataset;
   if (t.id === "mlTpl") fillTpl();
   if (d.pf) { const v = t.type === "checkbox" ? t.checked : t.value; updPerson(d.pid, { [d.pf]: v }, "Saved"); }
 });
+// Buttons in the Admin tab.
 $("s-admin").addEventListener("click", async e => {
   const t = e.target, d = t.dataset;
   if (t.id === "mtCheck") { await loadMaintenanceTest(); return; }
@@ -954,6 +1221,7 @@ $("s-admin").addEventListener("click", async e => {
     if (url) navigator.clipboard.writeText(url).then(() => toast("Real check-in link copied")).catch(() => toast("Select and copy the link above.", "err"));
     return;
   }
+  // Save the Chat pager webhook. The address is sent once and never shown again.
   if (t.id === "cpSave") {
     const url = $("cpUrl").value.trim();
     if (!/^https:\/\/chat\.googleapis\.com\/v1\/spaces\//.test(url)) { toast("Paste the webhook URL from the Chat space (it starts with https://chat.googleapis.com/v1/spaces/).", "err"); return; }
@@ -961,16 +1229,19 @@ $("s-admin").addEventListener("click", async e => {
     if (r) { D.chatPager = r; drawAdmin(); }
     return;
   }
+  // Send a test ping to the Chat space.
   if (t.id === "cpTest") {
     const r = await act(() => API.call("admin.chat.test"));
     if (r) toast(r.mentioned ? "Test ping sent. You should get an @mention." : "Test ping sent. Sign out and in once so you can be @mentioned.");
     return;
   }
+  // Disconnect the Chat pager.
   if (t.id === "cpClear") {
     const r = await act(() => API.call("admin.chat.clear"), "Chat pager disconnected");
     if (r) { D.chatPager = r; drawAdmin(); }
     return;
   }
+  // Save the watch phone number shown to workers.
   if (t.id === "mtPhoneSave") {
     const value = $("mtWatchPhone").value.trim();
     if (value && !/^\+?[0-9().\s-]{7,25}$/.test(value)) { toast("Enter a valid watch phone number.", "err"); return; }
@@ -982,8 +1253,10 @@ $("s-admin").addEventListener("click", async e => {
     toast("Watch phone saved"); return;
   }
 
+  // Save or end the acting manager.
   if (t.id === "adActSave") { await act(() => API.call("settings.save", { manager: $("adMgr").value, acting: { pid: $("adActWho").value, from: $("adActFrom").value, to: $("adActTo").value } }), "Saved"); await loadWeek(); }
   if (t.id === "adActClear") { await act(() => API.call("settings.save", { acting: { pid: "", from: "", to: "" } }), "Acting manager ended"); await loadWeek(); }
+  // Load the calendars this account owns, to choose one.
   if (t.id === 'adCalLoad') {
     const result = await act(() => API.call('admin.calendars'));
     if (result) {
@@ -994,6 +1267,7 @@ $("s-admin").addEventListener("click", async e => {
       toast(result.length ? 'Choose the calendar you want to use' : 'No owned calendars were found', result.length ? '' : 'err');
     }
   }
+  // Save the calendar choice and invitation settings.
   if (t.id === 'adCalSave') {
     const id = $('adCalId').value.trim();
     if (!id) { toast('Choose a calendar first', 'err'); return; }
@@ -1004,6 +1278,7 @@ $("s-admin").addEventListener("click", async e => {
     }), 'Calendar saved');
     if (r) await loadWeek();
   }
+  // Publish drafted watches to the calendar (shows a count and asks first).
   if (t.id === 'adCalPublish') {
     const id = $('adCalId').value.trim();
     if (!id || id !== D.settings.calId) { toast('Save the selected calendar first', 'err'); return; }
@@ -1017,8 +1292,10 @@ $("s-admin").addEventListener("click", async e => {
       `${r.created} Google Calendar events created${r.failed ? ', ' + r.failed + ' failed' : ''}.`);
     if (result) await loadWeek();
   }
+  // Test the backend connection.
   if (t.id === "adTest") { const r = await act(() => API.call("admin.test")); if (r) $("adTestOut").innerHTML = r.demo ? "Demo mode: no Google Sheet is connected." : `App owner: <b>${esc(r.owner)}</b><br>Sheet: <b>${esc(r.sheet)}</b><br>Calendar: ${r.calendar ? `<b>${esc(r.calendar)}</b>` : `<span style="color:var(--warn)">${esc(r.calendarError)}</span>`}<br>Emails left today: ${r.mailLeft} · Time zone: ${esc(r.timeZone)}${r.formUrl ? `<br><a href="${esc(r.formUrl)}" target="_blank" rel="noopener">Worker QR check-in Google Form</a>` : ''}`; }
 
+  // Add a person.
   if (t.id === "npAdd") {
     const email = $("npEmail").value.trim(); if (!email) { $("npEmail").focus(); toast("Enter their Google email", "err"); return; }
     const r = await act(() => API.call("person.add", { email, name: $("npName").value, role: $("npRole").value, invite: $("npInv").checked }), p => `${p.name} added${$("npInv") && $("npInv").checked ? " and invited" : ""}`);
@@ -1026,29 +1303,43 @@ $("s-admin").addEventListener("click", async e => {
   }
   if (d.pinv) await act(() => API.call("person.invite", { id: d.pinv }), "Invitation sent");
   if (d.pa) await updPerson(d.pid, { active: d.pa === "on" }, d.pa === "on" ? "Reactivated" : "Deactivated. They can no longer sign in.");
+  // Pick recipients for a group email.
   if (d.mt) {
     const active = D.people.filter(p => p.active !== false);
     if (d.mt === "*") mailTo = mailTo.size === active.length ? new Set() : new Set(active.map(p => p.id)); else mailTo.has(d.mt) ? mailTo.delete(d.mt) : mailTo.add(d.mt);
     $("mailPick").querySelectorAll(".pk").forEach(b => b.setAttribute("aria-pressed", b.dataset.mt === "*" ? mailTo.size === active.length : mailTo.has(b.dataset.mt))); mlCount();
   }
+  // Send the group email.
   if (t.id === "mlSend") {
     if (!mailTo.size) { toast("Pick recipients first", "err"); return; }
     const r = await act(() => API.call("mail.send", { pids: [...mailTo], subject: $("mlSubj").value, body: $("mlBody").value }), r => `Sent to ${r.sent}${DEMO ? " (demo, no email went out)" : ""}`);
     if (r) { mailTo = new Set(); await loadWeek(); }
   }
+  // Show recent admin activity from the audit trail.
   if (t.id === "adAudit") { const r = await act(() => API.call("audit.list")); if (r) openModal("Recent admin activity", "", r.length ? `<ul class="list">${r.map(x => `<li><div class="item"><b>${esc(x.action)}</b><span class="why">${esc(x.detail)}</span></div><span class="mono">${esc(x.who)} · ${esc(String(x.t).slice(0, 16).replace("T", " "))}</span></li>`).join("")}</ul>` : "<div class='empty'>Nothing yet.</div>", `<span></span><button class="btn" data-act="cancel">Close</button>`); }
 });
 
+// ---------------------------------------------------------------------
+// DEMO CONTROLS: switch between member and admin, or reset the sample data.
+// ---------------------------------------------------------------------
 /* ---------- demo controls ---------- */
 $("demoMember").onclick = () => { Demo.as = "member"; tab = null; loadWeek(); };
 $("demoAdmin").onclick = () => { Demo.as = "admin"; tab = null; loadWeek(); };
 $("demoReset").onclick = () => { Demo.st = seed(); Demo.save(); tab = null; report = null; loadWeek().then(() => toast("Demo data reset")); };
 
 
+// ---------------------------------------------------------------------
+// IN-APP ALERTS: while the app is open, it asks the backend every 15
+// seconds for new arrivals, departures and assistance requests, and shows
+// them as cards at the top of the screen (with an optional chime).
+// ---------------------------------------------------------------------
 /* ---------- maintenance-watch alerts (foreground only; push to follow) ---------- */
 let watchAlertTimer = null, watchAlertBusy = false, watchAlertUnsupported = false;
 let watchAudioCtx = null, watchAudioEnabled = false;
+// Which alerts this person has already seen (remembered in this browser),
+// so the same alert is never shown twice.
 const alertSeenKey = () => "bw-watch-alert-ids-" + (D?.me?.email || "").toLowerCase();
+// stopWatchAlerts: stop checking and remove the alert area (on sign-out).
 function stopWatchAlerts() {
   if (watchAlertTimer) clearInterval(watchAlertTimer);
   watchAlertTimer = null;
@@ -1056,6 +1347,7 @@ function stopWatchAlerts() {
   $("bwAlertTray")?.remove();
   $("bwSound")?.remove();
 }
+// watchSound: a short two-note chime, only if sound was turned on.
 function watchSound() {
   if (!watchAudioEnabled || !watchAudioCtx) return;
   try {
@@ -1072,6 +1364,7 @@ function watchSound() {
     });
   } catch (e) { /* Muted or unsupported device; visual alert still appears. */ }
 }
+// ensureWatchAlertUI: create the alert area and the sound button if needed.
 function ensureWatchAlertUI() {
   if (!$("bwWatchStyle")) {
     const css = document.createElement("style");
@@ -1114,6 +1407,9 @@ function ensureWatchAlertUI() {
     ($("whoChip")?.parentElement || $("app")).appendChild(button);
   }
 }
+// showWatchAlert: show one alert card: what happened, the worker and
+// location, who is responding, and buttons (I'm responding, open the log,
+// dismiss).
 function showWatchAlert(a) {
   ensureWatchAlertUI();
   // Once someone is responding, any open request card for the same worker is out of date.
@@ -1148,6 +1444,8 @@ function showWatchAlert(a) {
   $("bwAlertTray").prepend(card);
   while ($("bwAlertTray").children.length > 4) $("bwAlertTray").lastElementChild.remove();
 }
+// pollWatchAlerts: ask the backend for alerts. Skipped in demo mode, when
+// the app is hidden, or while a check is already running.
 async function pollWatchAlerts() {
   if (DEMO || !D?.me || !TOKEN || document.hidden || watchAlertBusy || watchAlertUnsupported) return;
   watchAlertBusy = true;
@@ -1158,9 +1456,11 @@ async function pollWatchAlerts() {
     try { ids = JSON.parse(localStorage.getItem(alertSeenKey()) || "[]"); } catch(e) {}
     if (!Array.isArray(ids)) ids = [];
     const seen = new Set(ids);
+    // New alerts are ones not seen before and less than 10 minutes old.
     const incoming = rows.filter(a => a?.id && !seen.has(a.id) && Date.now() - Date.parse(a.at) < 10 * 60000);
     rows.forEach(a => { if (a?.id) seen.add(a.id); });
     try { localStorage.setItem(alertSeenKey(), JSON.stringify([...seen].slice(-150))); } catch(e) {}
+    // Show at most 4 new cards, and chime once.
     incoming.slice(-4).forEach(showWatchAlert);
     if (incoming.length) watchSound();
   } catch (e) {
@@ -1168,14 +1468,19 @@ async function pollWatchAlerts() {
     if (e.code === "input" || /unknown|unsupported|action/i.test(e.message || "")) watchAlertUnsupported = true;
   } finally { watchAlertBusy = false; }
 }
+// startWatchAlerts: check now, then every 15 seconds.
 function startWatchAlerts() {
   if (DEMO || !TOKEN || !D?.me) return;
   ensureWatchAlertUI();
   if (!watchAlertTimer) watchAlertTimer = setInterval(pollWatchAlerts, 15000);
   pollWatchAlerts();
 }
+// When the app comes back to the screen, check right away.
 document.addEventListener("visibilitychange", () => { if (!document.hidden) pollWatchAlerts(); });
 
+// ---------------------------------------------------------------------
+// START: in demo mode go straight in; otherwise begin sign-in.
+// ---------------------------------------------------------------------
 /* ---------- start ---------- */
 if (DEMO) boot(); else startAuth();
 })();
