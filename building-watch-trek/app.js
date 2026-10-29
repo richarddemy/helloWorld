@@ -506,10 +506,14 @@ function drawLog() {
     ${l.fu ? `<span>Follow-up: ${esc(l.fu)}</span>` : ""}${l.ret ? `<span class="mono">Returning ${md(l.ret)}</span>` : ""}${l.prob && !l.newReq ? `<span>New problem: ${esc(l.prob)}</span>` : ""}</div>
     <div class="row" style="gap:6px">${l.prob && !l.newReq ? `<button class="btn small" data-mk="${l.id}">Open request</button>` : ""}${D.admin ? `<button class="btn small" data-res="${l.id}">Resolved</button>` : ""}</div></li>`).join("") : "<li class='empty'>Nothing waiting.</li>";
   const rows = [...D.log].sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : b.in - a.in);
-  $("logTbl").innerHTML = `<tr><th>Date</th><th>Worker</th><th>Job</th><th>In</th><th>Out</th><th>Finished</th><th>Follow-up / new problems</th><th>Logged by</th></tr>` + (rows.length ? rows.map(l => `<tr><td class="mono">${md(l.date)}</td><td>${esc(l.worker)}<div class="why">${esc(l.shop)}</div></td>
+  $("logTbl").innerHTML = `<tr><th>Date</th><th>Worker</th><th>Job</th><th>In</th><th>Out</th><th>Finished</th><th>Follow-up / new problems</th><th>Logged by</th>${D.admin ? "<th>Test email delivery</th>" : ""}</tr>` + (rows.length ? rows.map(l => `<tr><td class="mono">${md(l.date)}</td><td>${esc(l.worker)}<div class="why">${esc(l.shop)}</div></td>
     <td>${esc(l.task)}${l.req ? `<div class="why">${esc(reqShort(l.req))}</div>` : ""}</td><td class="mono">${fmt(+l.in)}</td><td class="mono">${isOut(l) ? fmt(+l.out) : '<span class="chip">in now</span>'}</td>
     <td>${l.done ? `<span class="chip ${l.done === "Yes" ? "ok" : "warn"}">${esc(l.done)}</span>` : ""}</td>
-    <td>${l.fu ? esc(l.fu) : ""}${l.ret ? `<div class="mono">Back ${md(l.ret)}</div>` : ""}${l.prob ? `<div class="why">New: ${esc(l.prob)}${l.newReq ? " (request opened)" : ""}</div>` : ""}</td><td class="why">${esc(l.by)}</td></tr>`).join("") : `<tr><td colspan="8" class="empty">No entries yet.</td></tr>`);
+    <td>${l.fu ? esc(l.fu) : ""}${l.ret ? `<div class="mono">Back ${md(l.ret)}</div>` : ""}${l.prob ? `<div class="why">New: ${esc(l.prob)}${l.newReq ? " (request opened)" : ""}</div>` : ""}</td><td class="why">${esc(l.by)}</td>${D.admin ? `<td class="why">
+    <div><b>Worker email:</b> ${l.workerEmailSentAt ? "Sent " + esc(l.workerEmailSentAt.slice(0,16).replace("T"," ")) : l.emailConsent ? "No successful send recorded" : "Not requested"}</div>
+    <div><b>Watch notified:</b> ${esc(l.watchArrivalAlertTo || "No successful send recorded")}</div>
+    ${l.watchDepartureAlertTo ? '<div><b>Departure sent:</b> ' + esc(l.watchDepartureAlertTo) + '</div>' : ""}
+    </td>` : ""}</tr>`).join("") : `<tr><td colspan="${D.admin ? 9 : 8}" class="empty">No entries yet.</td></tr>`);
 }
 function openCI() {
   const open = D.requests.filter(r => r.status !== "Closed");
@@ -552,6 +556,7 @@ async function saveCO() {
 $("s-log").addEventListener("click", async e => {
   const t = e.target.dataset;
   if (t.lg === "in") openCI();
+  if (t.lg === "refresh") await loadWeek();
   if (t.co) openCO(t.co);
   if (t.res) { await act(() => API.call("log.resolve", { id: t.res }), "Marked resolved"); await loadWeek(); }
   if (t.mk) { await act(() => API.call("log.makeReq", { id: t.mk }), "Service request opened"); await loadWeek(); }
