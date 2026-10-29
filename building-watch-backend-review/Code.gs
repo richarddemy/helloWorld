@@ -1,3 +1,11 @@
+/* REVIEW WARNING: This historical Code.gs is the earlier single-spreadsheet example.
+ * It is NOT the current live five-spreadsheet QR/email implementation.
+ * Do not deploy this file over the live Google Apps Script project.
+ * For the Request Assistance feature, start with the current five-spreadsheet
+ * Code.gs and run scripts/apply-assistance.cjs, then add Assistance.gs and the
+ * matching Core.gs. See ASSISTANCE-SETUP.md.
+ */
+
 /*
  * Building Watch API (Google Apps Script backend)
  *
