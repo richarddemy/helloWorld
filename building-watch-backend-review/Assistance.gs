@@ -96,7 +96,12 @@ function assistRegister_(st, email, P) {
   var endpoint = String(sub.endpoint || ""), p256dh = String(keys.p256dh || ""), auth = String(keys.auth || "");
   if (!assistAllowedEndpoint_(endpoint) || !/^[A-Za-z0-9_-]{60,160}$/.test(p256dh) || !/^[A-Za-z0-9_-]{16,60}$/.test(auth))
     throw err_("input","Unsupported or invalid browser push subscription.");
-  var rows = assistRows_("devices"), old = rows.filter(function(r){return r.pid === user.id && r.endpoint === endpoint;})[0];
+  // A browser endpoint may belong to only one signed-in account at a time.
+  var rows = assistRows_("devices"), deviceSheet = assistSheet_("devices",false);
+  rows.filter(function(r){return r.endpoint===endpoint && r.pid!==user.id;}).reverse()
+    .forEach(function(r){deviceSheet.deleteRow(r._row);});
+  rows = assistRows_("devices");
+  var old = rows.filter(function(r){return r.pid===user.id && r.endpoint===endpoint;})[0];
   if (old) assistSet_("devices",old._row,{p256dh:p256dh,auth:auth,updatedAt:H.nowISO()});
   else assistAppend_("devices",{id:Utilities.getUuid(),pid:user.id,endpoint:endpoint,p256dh:p256dh,auth:auth,createdAt:H.nowISO(),updatedAt:H.nowISO()});
   return {registered:true};
@@ -150,6 +155,15 @@ function assistRaise_(st,opts) {
   });
   if (recent.length >= 3) throw err_("rate","Please wait before sending another assistance request.");
   var ids=assistRecipients_(st);
+  // If the watch has no subscribed device, also alert the available supervisor.
+  var subscribed=assistRows_("devices");
+  if(ids.length && !ids.some(function(id){return subscribed.some(function(d){return d.pid===id;});})) {
+    var acting=st.settings.acting || {}, today=H.today();
+    var actingValid=acting.pid && (!acting.from || acting.from<=today) && (!acting.to || acting.to>=today);
+    var supervisor=actingValid ? assistPerson_(st,acting.pid) : null;
+    if(!supervisor) supervisor=assistPerson_(st,st.settings.manager);
+    if(supervisor && ids.indexOf(supervisor.id)<0) ids.push(supervisor.id);
+  }
   var record={id:"A-"+Utilities.getUuid(),createdAt:now.toISOString(),source:source,
     visitorId:visitorId,reporter:String(opts.reporter || "Facilities team").slice(0,100),
     reporterId:reporterId,location:location,message:message,
@@ -224,8 +238,16 @@ function assistWorkerSubmit_(P) {
     var lookup=assistWorker_(String(P.assistToken || ""));
     if (!lookup) return htmlResult_("This assistance link has expired.");
     var st=lookup.st,worker=lookup.worker;
-    var result=assistRaise_(st,{source:"Maintenance staff",visitorId:worker.id,reporter:worker.worker,
-      location:P.location,message:P.message});
+    var result;
+    try {
+      result=assistRaise_(st,{source:"Maintenance staff",visitorId:worker.id,reporter:worker.worker,
+        location:P.location,message:P.message});
+    } catch(e) {
+      if(e.code==="rate") return htmlResult_("Your request limit has been reached. Please wait before trying again.");
+      if(e.code==="input") return htmlResult_("Enter a location and a message to request assistance.");
+      Logger.log("Assistance form request failed: "+String(e));
+      return htmlResult_("We could not save the request. Please notify facilities staff directly.");
+    }
     return htmlResult_(result.recipientCount ?
       "Assistance request recorded. The facilities watch has been notified where notifications are enabled." :
       "Assistance request recorded, but no watch or manager is currently assigned. Please also use the facility's established emergency procedures if assistance is urgent.");
