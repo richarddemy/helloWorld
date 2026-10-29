@@ -48,7 +48,9 @@ source=source.replace(htmlButton,htmlButton+"\n"+
 const line=source.split('\n').filter(x=>x.includes("(phone ? '<p><a") && x.includes('Call the facilities watch'));
 if(line.length!==1)throw new Error('Telephone HTML link not found exactly once.');
 source=source.replace(line[0]+'\n','');
-if(source.includes('phoneLine') || source.includes("Call the facilities watch:"))
+once("    watchPhone: st.settings.watchPhone || '',\n", "");
+once("3. Fill in your name and phone, then paint", "3. Fill in your name, then paint");
+if(source.includes("watchPhone") || source.includes("tel:") || source.includes('phoneLine') || source.includes("Call the facilities watch:"))
   throw new Error('A phone link was left in the worker notification.');
 // Keep email link token handling in Google Apps Script; the public website receives no bearer token.
 fs.writeFileSync(output,source,'utf8');
