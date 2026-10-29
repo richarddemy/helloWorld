@@ -45,39 +45,39 @@ const env={
   HtmlService:{createHtmlOutput:html=>({html,setTitle(){return this;}})},
   ScriptApp:{getService:()=>({getUrl:()=> 'https://script.google.com/macros/s/test/exec'})}
 };
-const module=new Function(...Object.keys(env),src+
+const assistance=new Function(...Object.keys(env),src+
   ';return {setupAssistance,assistRecipients_,assistHandle_,assistRaise_,assistWorker_,assistAllowedEndpoint_};'
 )(...Object.values(env));
-module.setupAssistance();
-assert.deepEqual(module.assistRecipients_(st),['w1','w2'],'overlapping shifts must both be notified');
+assistance.setupAssistance();
+assert.deepEqual(assistance.assistRecipients_(st),['w1','w2'],'overlapping shifts must both be notified');
 const subscription={endpoint:'https://fcm.googleapis.com/fcm/send/a',keys:{p256dh:'a'.repeat(85),auth:'B'.repeat(22)}};
-assert.equal(module.assistHandle_(st,'worf@valid.test','assist.register',{subscription}).registered,true);
-module.assistHandle_(st,'data@valid.test','assist.register',{subscription:{...subscription,endpoint:subscription.endpoint+'2'}});
-assert.throws(()=>module.assistHandle_(st,'nobody@valid.test','assist.register',{subscription}),/Facilities team account/);
+assert.equal(assistance.assistHandle_(st,'worf@valid.test','assist.register',{subscription}).registered,true);
+assistance.assistHandle_(st,'data@valid.test','assist.register',{subscription:{...subscription,endpoint:subscription.endpoint+'2'}});
+assert.throws(()=>assistance.assistHandle_(st,'nobody@valid.test','assist.register',{subscription}),/Facilities team account/);
 // The same endpoint cannot retain another account's registration.
-module.assistHandle_(st,'data@valid.test','assist.register',{subscription});
-assert.equal(module.assistHandle_(st,'worf@valid.test','assist.status',{}).myDevices,0);
-module.assistHandle_(st,'worf@valid.test','assist.register',{subscription});
-const created=module.assistHandle_(st,'geordi@valid.test','assist.create',{location:'Engineering',message:'Need a ladder'});
+assistance.assistHandle_(st,'data@valid.test','assist.register',{subscription});
+assert.equal(assistance.assistHandle_(st,'worf@valid.test','assist.status',{}).myDevices,0);
+assistance.assistHandle_(st,'worf@valid.test','assist.register',{subscription});
+const created=assistance.assistHandle_(st,'geordi@valid.test','assist.create',{location:'Engineering',message:'Need a ladder'});
 assert.equal(created.recipientCount,2);
 assert.equal(pushed.length,1);
 assert.equal(pushed[0].subscriptions.length,2);
 assert(!JSON.stringify(pushed).includes('Engineering'),'lock-screen push must never carry specific location');
-assert.deepEqual(module.assistHandle_(st,'worf@valid.test','assist.list',{}).map(a=>a.id),[created.id]);
-assert.equal(module.assistHandle_(st,'worf@valid.test','assist.ack',{id:created.id}).status,'Acknowledged');
-assert.equal(module.assistAllowedEndpoint_('https://attacker.example.com/sink'),false);
-assert.equal(module.assistAllowedEndpoint_('http://fcm.googleapis.com/fcm/send/x'),false);
+assert.deepEqual(assistance.assistHandle_(st,'worf@valid.test','assist.list',{}).map(a=>a.id),[created.id]);
+assert.equal(assistance.assistHandle_(st,'worf@valid.test','assist.ack',{id:created.id}).status,'Acknowledged');
+assert.equal(assistance.assistAllowedEndpoint_('https://attacker.example.com/sink'),false);
+assert.equal(assistance.assistAllowedEndpoint_('http://fcm.googleapis.com/fcm/send/x'),false);
 // No current watch -> acting building manager.
 st.watches=[];st.settings.acting={pid:'m',from:'2026-10-29',to:'2026-10-30'};
-assert.deepEqual(module.assistRecipients_(st),['m']);
+assert.deepEqual(assistance.assistRecipients_(st),['m']);
 // Public emailed visitor link: limited requests and unusable after departure.
 st.log=[{id:'l1',tokenHash:'digest',tokenExpiry:String(Date.now()+3600000),workerOutAt:'',out:'',worker:'Geordi'}];
 const token='t'.repeat(48);
-assert(module.assistWorker_(token));
+assert(assistance.assistWorker_(token));
 st.log[0].workerOutAt='2026-10-29T14:00:00Z';
-assert.equal(module.assistWorker_(token),null);
+assert.equal(assistance.assistWorker_(token),null);
 let limited=false;
-try{for(let i=0;i<4;i++)module.assistRaise_(st,{source:'Maintenance staff',visitorId:'l1',location:'Hall',message:'Need assistance'});}
+try{for(let i=0;i<4;i++)assistance.assistRaise_(st,{source:'Maintenance staff',visitorId:'l1',location:'Hall',message:'Need assistance'});}
 catch(e){limited=e.code==='rate';}
 assert(limited,'assistance email bearer must be rate-limited');
 console.log('PASS: watch overlap, manager fallback, push fanout, payload privacy, subscriptions, auth, acknowledgements, worker expiry and rate limit');
