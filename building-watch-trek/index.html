@@ -244,12 +244,12 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
   <section id="s-log" class="stack">
     <div class="cols2">
       <div class="panel">
-        <div class="row"><div><h2>Workers in the building <span id="nowCount" style="color:var(--accent)"></span></h2><div class="sub">Maintenance and contractors, logged by the watch.</div></div><button class="btn primary" data-lg="in">Check in a worker</button></div>
+        <div class="row"><div><h2>Workers in the building <span id="nowCount" style="color:var(--accent)"></span></h2><div class="sub">Outside maintenance staff and contractors only; not facilities team assignments.</div></div><button class="btn primary" data-lg="in">Check in a worker</button></div>
         <ul class="list" id="nowList"></ul>
       </div>
       <div class="panel"><h2>Needs follow-up</h2><ul class="list" id="fuList"></ul></div>
     </div>
-    <div class="panel"><h2>Maintenance log</h2><div class="sub" style="margin-top:-8px">Last 30 days and anyone still in the building.</div><div class="scroll"><table class="tbl" id="logTbl"></table></div></div>
+    <div class="panel"><h2>Maintenance staff QR check-in</h2><p class="sub">Maintenance staff and contractors do not sign in to the Facilities Team app. They scan this code to check in, receive a checkout email, and call the watch if needed.</p><div class="row start" style="align-items:center;flex-wrap:wrap"><img id="maintenanceQrImage" width="180" height="180" alt="QR code for maintenance staff check-in" style="background:white;padding:8px;border-radius:10px"><div style="flex:1;min-width:220px"><label>Maintenance check-in link<input id="maintenanceQrLink" readonly></label><div class="row start"><a id="maintenanceQrOpen" class="btn primary" target="_blank" rel="noopener">Test check-in</a><button id="maintenanceQrCopy" class="btn">Copy QR link</button><button id="maintenanceQrEmail" class="btn">Preview email</button></div></div></div><p class="why">Demo QR: opens a simulated contractor flow; no real email is sent and no live attendance is recorded. The watch phone number and real QR backend still require deployment.</p></div><div class="panel"><h2>Maintenance staff log</h2><div class="sub" style="margin-top:-8px">Last 30 days and anyone still in the building.</div><div class="scroll"><table class="tbl" id="logTbl"></table></div></div>
   </section>
 
   <section id="s-legacy-check" class="cols2" hidden>
