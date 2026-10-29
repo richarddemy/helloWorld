@@ -510,8 +510,8 @@ function drawLog() {
     <td>${esc(l.task)}${l.req ? `<div class="why">${esc(reqShort(l.req))}</div>` : ""}</td><td class="mono">${fmt(+l.in)}</td><td class="mono">${isOut(l) ? fmt(+l.out) : '<span class="chip">in now</span>'}</td>
     <td>${l.done ? `<span class="chip ${l.done === "Yes" ? "ok" : "warn"}">${esc(l.done)}</span>` : ""}</td>
     <td>${l.fu ? esc(l.fu) : ""}${l.ret ? `<div class="mono">Back ${md(l.ret)}</div>` : ""}${l.prob ? `<div class="why">New: ${esc(l.prob)}${l.newReq ? " (request opened)" : ""}</div>` : ""}</td><td class="why">${esc(l.by)}</td>${D.admin ? `<td class="why">
-    <div><b>Worker email:</b> ${l.workerEmailSentAt ? "Sent " + esc(l.workerEmailSentAt.slice(0,16).replace("T"," ")) : l.emailConsent ? "No successful send recorded" : "Not requested"}</div>
-    <div><b>Watch notified:</b> ${esc(l.watchArrivalAlertTo || "No successful send recorded")}</div>
+    <div><b>Worker email:</b> ${l.workerEmailSentAt ? "Sent " + esc(l.workerEmailSentAt.slice(0,16).replace("T"," ")) : l.emailConsent ? (Object.prototype.hasOwnProperty.call(l, "workerEmailSentAt") ? "No successful send recorded" : "Status unavailable until backend upgrade") : "Not requested"}</div>
+    <div><b>Watch notified:</b> ${esc(l.watchArrivalAlertTo || (Object.prototype.hasOwnProperty.call(l, "watchArrivalAlertTo") ? "No successful send recorded" : "Status unavailable until backend upgrade"))}</div>
     ${l.watchDepartureAlertTo ? '<div><b>Departure sent:</b> ' + esc(l.watchDepartureAlertTo) + '</div>' : ""}
     </td>` : ""}</tr>`).join("") : `<tr><td colspan="${D.admin ? 9 : 8}" class="empty">No entries yet.</td></tr>`);
 }
