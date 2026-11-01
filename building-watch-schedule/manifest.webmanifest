@@ -1,0 +1,12 @@
+{
+  "name": "Building Watch Schedule",
+  "short_name": "Building Watch",
+  "description": "Submit your hours and see the building watch.",
+  "id": "./",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#13233a",
+  "theme_color": "#13233a",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
