@@ -1,0 +1,328 @@
+<!doctype html>
+<!-- HOW TO READ THIS FILE (for non-programmers) -->
+<!-- Text between these markers is a note for people. This file is the page -->
+<!-- layout: the header, the tabs, and an empty frame for each tab. app.js -->
+<!-- fills the frames. The style section sets colors, sizes and spacing. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Building Watch Schedule</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#13233a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Saira+Stencil+One&display=swap">
+<style>
+/* Colors. Haze gray and navy from the fleet; signal-flag yellow marks the watch. */
+:root{
+  --bg:#e6e9e8; --surface:#f8f9f8; --ink:#13233a; --muted:#52606d; --line:#c6cdcd;
+  --navy:#13233a; --on-navy:#f2f5f6; --paint:#2a6496; --paint-soft:#d3e1ed;
+  --h0:#dde2e2; --h1:#c8d9e7; --h2:#94b8d4; --h3:#5288b3; --h4:#2a6496;
+  --flag:#f4bf1d; --flag-ink:#13233a; --flag-soft:#fbeec3;
+  --warn:#ad2a1e; --warn-soft:#f7e1dd; --ok:#1d6b47; --ok-soft:#d9ece1;
+  --body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --stencil:"Saira Stencil One","Public Sans",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1926; --surface:#172536; --ink:#e7edf1; --muted:#9dacb9; --line:#2d3e52;
+  --paint:#619fd4; --paint-soft:#1f3a55;
+  --h0:#1c2b3c; --h1:#1f3a55; --h2:#2a557f; --h3:#3f7cb4; --h4:#619fd4;
+  --flag-soft:#3b3212; --warn:#f2907f; --warn-soft:#3c1f1a; --ok:#68c596; --ok-soft:#173226; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1926; --surface:#172536; --ink:#e7edf1; --muted:#9dacb9; --line:#2d3e52;
+  --paint:#619fd4; --paint-soft:#1f3a55;
+  --h0:#1c2b3c; --h1:#1f3a55; --h2:#2a557f; --h3:#3f7cb4; --h4:#619fd4;
+  --flag-soft:#3b3212; --warn:#f2907f; --warn-soft:#3c1f1a; --ok:#68c596; --ok-soft:#173226; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;font-variant-numeric:tabular-nums}
+h1,h2,h3,p{margin:0}
+h2{font-size:1.2rem;font-weight:700;line-height:1.25}
+h3{font-size:1rem;font-weight:700}
+button,input,select{font:inherit;color:inherit}
+button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,td:focus-visible{outline:2px solid var(--flag);outline-offset:2px}
+a{color:var(--paint)}
+
+/* The navy masthead with the stenciled name. */
+.mast{background:var(--navy);color:var(--on-navy);padding:calc(14px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px))}
+.mastin{max-width:1088px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.mastrow{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+.mark{font-family:var(--stencil);font-size:1.7rem;line-height:1.1;letter-spacing:.01em;font-weight:400}
+.who{display:flex;gap:12px;align-items:center;font-size:.9rem}
+.linkbtn{border:0;background:none;padding:2px 0;color:inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+.tabs button{border:0;background:transparent;color:var(--on-navy);opacity:.78;font-weight:600;font-size:.95rem;padding:10px 14px;cursor:pointer;white-space:nowrap;border-radius:6px 6px 0 0}
+.tabs button[aria-selected="true"]{background:var(--bg);color:var(--ink);opacity:1}
+.tabs .count{display:inline-block;min-width:20px;margin-left:6px;padding:0 5px;border-radius:99px;background:var(--flag);color:var(--flag-ink);font-size:.74rem;line-height:20px;text-align:center}
+
+.wrap{max-width:1120px;margin:0 auto;padding:18px max(16px,env(safe-area-inset-right,0px)) calc(48px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:16px}
+.demo{background:var(--flag);color:var(--flag-ink);border-radius:6px;padding:8px 12px;font-size:.88rem;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between}
+.seg{display:inline-flex;border:1px solid var(--flag-ink);border-radius:6px;overflow:hidden}
+.seg button{border:0;background:transparent;font-weight:600;font-size:.84rem;padding:5px 10px;cursor:pointer;color:var(--flag-ink)}
+.seg button[aria-pressed="true"]{background:var(--flag-ink);color:var(--flag)}
+.weeknav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.weeknav b{font-size:1.1rem;margin-right:6px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.cols{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:16px;align-items:start}
+.cols.even{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.stack{display:flex;flex-direction:column;gap:16px;min-width:0}
+@media (max-width:860px){.cols,.cols.even{grid-template-columns:1fr}}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sub{color:var(--muted);font-size:.9rem}
+.btn{display:inline-block;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:600;font-size:.9rem;line-height:1.3;padding:8px 13px;border-radius:6px;cursor:pointer;text-decoration:none}
+.btn.primary{background:var(--navy);border-color:var(--navy);color:var(--on-navy)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn.primary{background:var(--flag);border-color:var(--flag);color:var(--flag-ink)}}
+:root[data-theme="dark"] .btn.primary{background:var(--flag);border-color:var(--flag);color:var(--flag-ink)}
+.btn.small{padding:5px 10px;font-size:.84rem}
+.btn:disabled{opacity:.5;cursor:default}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+/* On phones: all five days fit without sideways scrolling, the tabs tighten, and the watch bill comes first. */
+@media (max-width:640px){
+  .scroll table.grid{min-width:0;border-spacing:2px}
+  .scroll .grid th{font-size:.68rem}
+  .scroll .grid th.t{width:36px;padding-right:3px}
+  .tabs{gap:0}
+  .tabs button{padding:9px 9px;font-size:.88rem}
+  .weeknav b{width:100%;margin:0}
+  #billPanel{order:-1}
+}
+
+/* The half-hour grids. */
+table.grid{border-collapse:separate;border-spacing:3px;width:100%;min-width:500px}
+.grid th{font-weight:500;font-size:.78rem;color:var(--muted);text-align:center;padding:2px 0;white-space:nowrap}
+.grid th.today{color:var(--ink);font-weight:700}
+.grid th.t{text-align:right;padding-right:6px;width:46px}
+.grid td{height:24px;border-radius:3px;background:var(--h0);position:relative}
+/* Dragging on a cell marks time. The time labels at the left still scroll the page on a phone. */
+#paintGrid,#heatGrid{user-select:none;-webkit-user-select:none}
+#paintGrid td,#heatGrid td{touch-action:pan-x pinch-zoom}
+#paintGrid td{cursor:crosshair}
+#paintGrid td.on{background:var(--paint)}
+#paintGrid td.asg{box-shadow:inset 5px 0 0 var(--flag)}
+.grid tr.off th.t{font-style:italic}
+.grid tr.off td:not(.on):not([class*="l"]):not(.gap){opacity:.55}
+#heatGrid tr.std th.t{box-shadow:inset -3px 0 0 var(--flag)}
+#heatGrid td{cursor:pointer;text-align:center;font-size:.76rem;font-weight:500;color:var(--ink)}
+#heatGrid td.l1{background:var(--h1)} #heatGrid td.l2{background:var(--h2)}
+#heatGrid td.l3{background:var(--h3);color:#fff} #heatGrid td.l4{background:var(--h4);color:#fff}
+#heatGrid td.gap{background:transparent;outline:1.5px dashed var(--warn);outline-offset:-2px;color:var(--warn)}
+#heatGrid td.sel{box-shadow:0 0 0 2px var(--ink) inset}
+#heatGrid td.w::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--flag);border-radius:3px 0 0 3px}
+#heatGrid td.past{cursor:default;opacity:.55}
+.legend{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:.82rem;color:var(--muted);align-items:center}
+.sw{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:5px}
+
+/* The watch bill: the page's centerpiece. Yellow is a published watch. */
+table.bill{border-collapse:separate;border-spacing:0 6px;width:100%}
+.bill th{font-size:.84rem;font-weight:600;color:var(--muted);text-align:left;padding:0 8px 0 0;white-space:nowrap;vertical-align:middle}
+.bill th.today{color:var(--ink);font-weight:700}
+.bill td{padding:0 0 0 6px;width:44%;vertical-align:top}
+.slot{display:flex;flex-direction:column;justify-content:center;width:100%;min-height:54px;text-align:left;padding:7px 10px;border-radius:5px;border:1.5px dashed var(--line);background:transparent;color:var(--muted);font-size:.88rem;font-weight:500;cursor:pointer;line-height:1.25;overflow-wrap:anywhere}
+.slot.draft{border:1.5px dashed var(--flag);background:var(--flag-soft);color:var(--ink);font-weight:600}
+.slot.set{border:1.5px solid var(--flag);background:var(--flag);color:var(--flag-ink);font-weight:700}
+.slot:disabled{cursor:default;opacity:.6}
+.slot small{font-weight:500;font-size:.76rem}
+.slot .out{color:var(--warn);font-weight:600}
+.slot.set .out{color:#7a1b12}
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;font-size:.92rem}
+.list>li{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px 10px;border-bottom:1px solid var(--line);padding:7px 0}
+.list>li:last-child{border-bottom:0}
+.list>li.mine{font-weight:700}
+.empty{color:var(--muted);font-size:.9rem}
+.chip{font-size:.76rem;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--paint-soft);color:var(--ink);white-space:nowrap}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.flag{background:var(--flag);color:var(--flag-ink)}
+.panel.status{flex-direction:row;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between}
+.tally{font-size:1.05rem;font-weight:700}
+
+/* Forms and tables. */
+label{font-size:.82rem;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+label.inline{flex-direction:row;align-items:center;gap:8px;font-size:.92rem;color:var(--ink)}
+select,input{padding:8px 9px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);min-width:0;width:100%;font-size:16px}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--paint)}
+.addrow{display:grid;grid-template-columns:2fr 2fr 1fr auto;gap:10px;align-items:end}
+@media (max-width:640px){.addrow{grid-template-columns:1fr}}
+table.tbl{border-collapse:collapse;width:100%;min-width:640px;font-size:.9rem}
+.tbl th{font-size:.8rem;font-weight:600;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+.tbl td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl tr.gone{opacity:.6}
+.tbl select,.tbl input[type=text]{padding:5px 6px;font-size:.9rem}
+
+/* Messages and pop-ups. */
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:var(--on-navy);border:1px solid var(--on-navy);padding:10px 16px;border-radius:6px;font-size:.9rem;font-weight:500;z-index:50;max-width:min(92vw,520px)}
+.toast.err{background:var(--warn);color:#fff;border-color:var(--warn)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .toast.err{color:#2b0d08}}
+:root[data-theme="dark"] .toast.err{color:#2b0d08}
+.progress{position:fixed;left:0;right:0;top:0;height:3px;z-index:60;background:var(--flag);animation:pulse 1s ease-in-out infinite alternate}
+@keyframes pulse{from{opacity:.35}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.progress{animation:none}}
+.scrim{position:fixed;inset:0;background:rgba(9,17,28,.55);display:flex;align-items:flex-end;justify-content:center;z-index:30;padding:16px}
+@media (min-width:600px){.scrim{align-items:center}}
+.dlg{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;width:100%;max-width:480px;display:flex;flex-direction:column;gap:12px;max-height:88vh}
+.dlgbody{display:flex;flex-direction:column;gap:8px;overflow-y:auto}
+.dlgact{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center}
+.cand{flex-direction:row;display:flex;gap:10px;align-items:flex-start;padding:9px 11px;border:1px solid var(--line);border-radius:6px;cursor:pointer;color:var(--ink);font-size:.95rem}
+.cand:has(input:checked){border-color:var(--paint);box-shadow:inset 0 0 0 1px var(--paint)}
+.cand input{margin-top:1px;flex:none}
+.cand .meta{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:3px}
+.copyrow{display:flex;gap:6px}
+
+/* The sign-in screen. */
+.gate{min-height:100vh;min-height:100dvh;background:var(--navy);display:flex;align-items:center;justify-content:center;padding:16px}
+.gatebox{background:var(--surface);border-radius:8px;padding:22px;width:100%;max-width:430px;display:flex;flex-direction:column;gap:14px}
+.gatebox .mark{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="progress" id="progress" hidden></div>
+
+<main class="gate" id="gate"><div class="gatebox" id="gateBody"><h1 class="mark">Building Watch</h1><p class="sub">Loading</p></div></main>
+
+<div id="app" hidden>
+  <header class="mast"><div class="mastin">
+    <div class="mastrow">
+      <h1 class="mark">Building Watch</h1>
+      <div class="who"><button class="linkbtn" id="meBtn" title="Change your name"></button><button class="linkbtn" id="signOut">Sign out</button></div>
+    </div>
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Sections"></nav>
+  </div></header>
+
+  <div class="wrap">
+    <div class="demo" id="demoBar" hidden>
+      <span>Demo with sample data. Nothing leaves this browser.</span>
+      <div class="btns">
+        <div class="seg"><button id="demoMember" aria-pressed="false">Sailor view</button><button id="demoAdmin" aria-pressed="true">Manager view</button></div>
+        <button class="btn small" id="demoReset">Reset demo</button>
+      </div>
+    </div>
+
+    <div class="weeknav" id="weekNav">
+      <b id="wkLabel"></b>
+      <button class="btn small" id="wkPrev" aria-label="Previous week">Previous</button>
+      <button class="btn small" id="wkNow">This week</button>
+      <button class="btn small" id="wkNext" aria-label="Next week">Next</button>
+    </div>
+
+    <!-- My week: every sailor submits their hours here. -->
+    <section id="s-week" class="cols" hidden>
+      <div class="panel">
+        <div class="stack" style="gap:4px">
+          <h2>When will you be in the building?</h2>
+          <p class="sub">Drag down a day to mark your time. Drag over marked time to erase it. Out all week? Submit it empty.</p>
+        </div>
+        <div class="row">
+          <div class="btns">
+            <button class="btn small" id="sameLast">Same as last week</button>
+            <button class="btn small" id="copyMon">Copy Monday to all</button>
+            <button class="btn small" id="clearMe">Clear</button>
+            <button class="btn small" data-hrs>Extended hours</button>
+          </div>
+          <button class="btn primary" id="saveMe">Submit my hours</button>
+        </div>
+        <div class="scroll"><table class="grid" id="paintGrid"></table></div>
+        <div class="legend">
+          <span><span class="sw" style="background:var(--paint)"></span>In the building</span>
+          <span><span class="sw" style="background:var(--flag);width:6px"></span>Your watch</span>
+          <span id="saveState"></span>
+        </div>
+      </div>
+      <div class="panel"><h2>This week's watch</h2><ul class="list" id="weekBill"></ul></div>
+    </section>
+
+    <!-- Set the watch: the building manager. -->
+    <section id="s-set" class="stack" hidden>
+      <div class="panel status" id="subStatus"></div>
+      <div class="cols">
+        <div class="panel">
+          <div class="row">
+            <h2>Who's in the building</h2>
+            <button class="btn small" data-hrs>Extended hours</button>
+          </div>
+          <p class="sub">The number is how many people are in. Drag down a day to set a watch for any stretch of time.</p>
+          <div class="scroll"><table class="grid" id="heatGrid"></table></div>
+          <div class="legend">
+            <span><span class="sw" style="background:var(--h1)"></span>1</span>
+            <span><span class="sw" style="background:var(--h2)"></span>2</span>
+            <span><span class="sw" style="background:var(--h3)"></span>3</span>
+            <span><span class="sw" style="background:var(--h4)"></span>4+</span>
+            <span><span class="sw" style="outline:1.5px dashed var(--warn);outline-offset:-2px"></span>Nobody in</span>
+            <span><span class="sw" style="background:var(--flag);width:6px"></span>On watch</span>
+          </div>
+        </div>
+        <div class="panel" id="billPanel">
+          <h2>Watch bill</h2>
+          <table class="bill" id="bill"></table>
+          <div id="otherWatches"></div>
+          <div class="legend">
+            <span><span class="sw" style="background:var(--flag)"></span>On the calendar</span>
+            <span><span class="sw" style="background:var(--flag-soft);outline:1.5px dashed var(--flag);outline-offset:-2px"></span>Draft</span>
+          </div>
+          <div id="pubBox" class="stack" style="gap:6px"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="s-people" class="stack" hidden>
+      <div class="panel">
+        <h2>Add someone</h2>
+        <div class="addrow">
+          <label>Google email<input id="addEmail" type="email" autocomplete="off" placeholder="name@gmail.com"></label>
+          <label>Rank and name<input id="addName" type="text" autocomplete="off" placeholder="MU2 Smith"></label>
+          <label>Access<select id="addRole"><option value="Member">Sailor</option><option value="Admin">Admin</option></select></label>
+          <button class="btn primary" id="addGo">Add</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Everyone with access</h2>
+        <p class="sub">Only people on this list can sign in. Admins can set the watch, publish it and manage this list.</p>
+        <div class="scroll"><table class="tbl" id="peopleTbl"></table></div>
+      </div>
+    </section>
+
+    <section id="s-cal" class="cols even" hidden>
+      <div class="panel">
+        <h2>Google Calendar</h2>
+        <p class="sub" id="calNow"></p>
+        <label>Publish the watch to<select id="calPick"></select></label>
+        <label class="inline"><input type="checkbox" id="calInv"> Send each person a calendar invitation</label>
+        <label>Reminder before a watch<select id="calRem">
+          <option value="0">None</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option>
+        </select></label>
+        <div class="btns"><button class="btn primary" id="calSave">Save calendar settings</button><button class="btn" id="calNew">Create a Building Watch calendar</button></div>
+      </div>
+      <div class="panel">
+        <h2>How publishing works</h2>
+        <ul class="list">
+          <li>Submitted hours never reach a calendar. Only the watch does.</li>
+          <li>A watch stays a draft, seen only by admins, until you publish it.</li>
+          <li>Taking someone off a published watch removes their calendar event right away.</li>
+          <li id="calShare">To let everyone see the full watch on their own calendar, share this calendar from Google Calendar's settings.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="scrim" id="modal" role="dialog" aria-modal="true" aria-labelledby="dlgT" hidden>
+  <div class="dlg">
+    <div><h2 id="dlgT" tabindex="-1"></h2><p class="sub" id="dlgSub"></p></div>
+    <div class="dlgbody" id="dlgBody"></div>
+    <div class="dlgact" id="dlgAct"></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="config.js"></script>
+<script src="core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
