@@ -22,3 +22,18 @@ In Admin: **Load my calendars → Select a calendar → Save calendar settings**
 Run `setupWorkerForm()` in the private Apps Script editor to create a QR-linked Google Form that logs maintenance check-ins and can send one-time email sign-out links.
 
 The Apps Script deployment / Google OAuth configuration requires the account owner's interactive authorization; the GitHub frontend alone is not a complete live system.
+
+## Two-front-end testbed (4 November 2026)
+
+These are separate GitHub Pages interfaces to the **same configured Google Apps Script endpoint and Google Sheets**. No backend change is required for existing scheduling operations.
+
+- Full Building Watch: https://richarddemy.github.io/helloWorld/building-watch-trek/
+- Scheduling-only console: https://richarddemy.github.io/helloWorld/building-watch-scheduling/
+- Full fictional demo: https://richarddemy.github.io/helloWorld/building-watch-trek/?demo
+- Scheduling fictional demo: https://richarddemy.github.io/helloWorld/building-watch-scheduling/?demo
+
+In either demo, choose Admin or Sailor and try painting availability, saving it, selecting a watch block and assigning someone. Use the header's link to switch interfaces. The **two fictional demos share one browser-local sample datastore** and can show each other's changes on page reload; they never write Google Sheets or Calendar. They share sample state only in the **same browser and origin**, not across devices.
+
+Outside `?demo`, both interfaces use the same `config.js` Apps Script URL and Google sign-in client ID and require a Google account authorized by the existing backend. Only the original full interface has worker check-in, maintenance requests, crew assignments and reports. Only administrators can perform restricted scheduling actions, enforced by the backend.
+
+To present to reviewers without granting Google account access, **use the two `?demo` links**. The live Google-connected path must be tested interactively using an authorized sign-in before being represented as fully end-to-end verified. This is a fictional-data testbed, not approved Navy operational software.

@@ -204,7 +204,7 @@ const API = {
 const Demo = {
   // key: where the sample data is saved in this browser.
   // as: whether the demo is acting as the admin or as a member.
-  key: "bw-star-trek-scheduling-demo-v1", as: "admin", st: null,
+  key: "bw-star-trek-shared-demo-v1", as: "admin", st: null,
   emails: { admin: "picard@demo.invalid", member: "data@demo.invalid" },
   // load: use saved sample data, or create fresh sample data.
   load() { try { const t = localStorage.getItem(this.key); if (t) { this.st = JSON.parse(t); return; } } catch (e) {} this.st = seed(); },
@@ -212,7 +212,7 @@ const Demo = {
   save() { try { const s = Object.assign({}, this.st); delete s._dirty; delete s._warn; localStorage.setItem(this.key, JSON.stringify(s)); } catch (e) {} },
   // call: answer one request the way the real backend would.
   async call(action, payload) {
-    if (!this.st) this.load();
+    if (!this.st || action === "load") this.load();
     // A short pause so the demo feels like a real network.
     await new Promise(r => setTimeout(r, 120));
     // A few admin actions are faked here because they need real Google services.
@@ -304,7 +304,7 @@ function seed() {
 // ---------------------------------------------------------------------
 // gate: show the sign-in screen (instead of the app) with a message.
 /* ---------- sign-in gate ---------- */
-function gate(html) { $("app").hidden = true; $("gate").hidden = false; $("gateBody").innerHTML = `<div><div class="eyebrow">Starfleet Operations · Scheduling</div><h1>Starfleet Scheduling</h1></div>` + html; }
+function gate(html) { $("app").hidden = true; $("gate").hidden = false; $("gateBody").innerHTML = `<div><div class="eyebrow">Starfleet Operations · Scheduling</div><h1>Starfleet Scheduling</h1></div>` + html + (DEMO ? "" : "<p class=\"why\" style=\"margin-top:14px\">Reviewing the testbed? <a class=\"btn small\" href=\"?demo\">Open fictional-data demo without signing in</a></p>"); }
 // jwt: read the readable middle part of a Google sign-in pass (expiry time).
 function jwt(t) { try { return JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))); } catch (e) { return {}; } }
 // loadGIS: load Google's sign-in button from Google.

@@ -129,7 +129,7 @@ const loadLines = [
   "Contacting Starfleet Command…",
   "Authenticating command credentials…",
   "Requesting duty rosters from the main computer…",
-  "Synchronizing crew availability and assigned shifts…",
+  "Synchronizing personnel and maintenance records…",
   "Calibrating long-range calendar sensors…",
   "Awaiting subspace transmission…",
   "Routing data through the Enterprise computer core…",
@@ -204,7 +204,7 @@ const API = {
 const Demo = {
   // key: where the sample data is saved in this browser.
   // as: whether the demo is acting as the admin or as a member.
-  key: "bw-star-trek-scheduling-demo-v2", as: "admin", st: null,
+  key: "bw-star-trek-shared-demo-v1", as: "admin", st: null,
   emails: { admin: "picard@demo.invalid", member: "data@demo.invalid" },
   // load: use saved sample data, or create fresh sample data.
   load() { try { const t = localStorage.getItem(this.key); if (t) { this.st = JSON.parse(t); return; } } catch (e) {} this.st = seed(); },
@@ -212,7 +212,7 @@ const Demo = {
   save() { try { const s = Object.assign({}, this.st); delete s._dirty; delete s._warn; localStorage.setItem(this.key, JSON.stringify(s)); } catch (e) {} },
   // call: answer one request the way the real backend would.
   async call(action, payload) {
-    if (!this.st) this.load();
+    if (!this.st || action === "load") this.load();
     // A short pause so the demo feels like a real network.
     await new Promise(r => setTimeout(r, 120));
     // A few admin actions are faked here because they need real Google services.
@@ -304,7 +304,7 @@ function seed() {
 // ---------------------------------------------------------------------
 // gate: show the sign-in screen (instead of the app) with a message.
 /* ---------- sign-in gate ---------- */
-function gate(html) { $("app").hidden = true; $("gate").hidden = false; $("gateBody").innerHTML = `<div><div class="eyebrow">Starfleet Operations · Scheduling</div><h1>Starfleet Scheduling</h1></div>` + html; }
+function gate(html) { $("app").hidden = true; $("gate").hidden = false; $("gateBody").innerHTML = `<div><div class="eyebrow">Facilities</div><h1>Building Watch</h1></div>` + html + (DEMO ? "" : "<p class=\"why\" style=\"margin-top:14px\">Reviewing the testbed? <a class=\"btn small\" href=\"?demo\">Open fictional-data demo without signing in</a></p>"); }
 // jwt: read the readable middle part of a Google sign-in pass (expiry time).
 function jwt(t) { try { return JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))); } catch (e) { return {}; } }
 // loadGIS: load Google's sign-in button from Google.
@@ -380,7 +380,7 @@ async function boot() {
     $("gate").hidden = true; $("app").hidden = false;
     $("demoBar").hidden = !DEMO; $("signOut").hidden = DEMO;
     await loadWeek();
-    // Scheduling mode has no maintenance arrival/assistance alerts.
+    startWatchAlerts();
   } finally { endLoading(); }
 }
 // loadWeek: fetch everything for the week on screen and redraw.
@@ -388,15 +388,7 @@ async function loadWeek(keepTab) {
   beginLoading("Requesting duty rosters from the main computer…");
   try {
   const d = await act(() => API.call("load", { week: week() }));
-  if (!d) {
-    // Previously the app became a blank screen after a backend error.
-    // Keep a visible retry action instead of trapping the user.
-    const problem = $("scheduleConnectionProblem");
-    if (problem) problem.hidden = false;
-    return;
-  }
-  const problem = $("scheduleConnectionProblem");
-  if (problem) problem.hidden = true;
+  if (!d) return;
   D = d;
   // Use whatever time grid the backend reports.
   setGrid(D.grid);
@@ -417,12 +409,13 @@ async function loadWeek(keepTab) {
 }
 // tabList: the tabs this person sees. Admins see more.
 function tabList() {
-  // Reuse all original scheduling logic and the same backend;
-  // hide unrelated operations without deleting or rewriting them.
-  const t = [["week", "My availability"]];
-  if (D.admin) t.push(["bill", "Duty schedule"]);
-  t.push(["mine", "My calendars"]);
-  if (D.admin) t.push(["admin", "Schedule admin"]);
+  const t = [["week", "My week"]];
+  if (D.admin) t.push(["bill", "Watch bill"]);
+  t.push(["log", "Maintenance staff"]);
+  t.push(["crew", D.admin ? "Facilities team assignments" : "My facilities assignments"]);
+  t.push(["reqs", "Maintenance requests"]);
+  if (D.admin) t.push(["reports", "Reports"], ["admin", "Admin"]);
+  t.push(["mine", "My settings"]);
   return t;
 }
 // Quick lookups: a person by code, a name by code, and everyone who stands watch.
@@ -437,7 +430,7 @@ function followups() { return D.log.filter(l => isOut(l) && !l.fuClosed && (l.do
 // current tab.
 function render() {
   // Small number badges on tabs (follow-ups, open requests).
-  const b = {}; // No maintenance badges in scheduling mode.
+  const b = { log: followups().length, reqs: D.admin ? D.requests.filter(r => r.status === "Open").length : 0 };
   $("tabs").innerHTML = tabList().map(([k, l]) => `<button role="tab" aria-selected="${k === tab}" data-tab="${k}">${l}${b[k] ? `<span class="badge">${b[k]}</span>` : ""}</button>`).join("");
   const wk = week();
   $("wkLabel").textContent = `Week of ${parse(wk[0]).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}`;
@@ -458,7 +451,6 @@ $("wkPrev").onclick = leaveWeek(() => { weekStart = addDays(weekStart, -7); load
 $("wkNext").onclick = leaveWeek(() => { weekStart = addDays(weekStart, 7); loadWeek(); });
 $("wkNow").onclick = leaveWeek(() => { weekStart = monday(new Date()); loadWeek(); });
 $("signOut").onclick = () => signOut();
-$("retryConnection").onclick = () => loadWeek();
 // Warn before closing the page if there is unsaved time.
 window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
 
@@ -1166,11 +1158,8 @@ function drawAdmin() {
     <div class="row"><span class="why" id="mlCount"></span><button class="btn primary" id="mlSend">Send</button></div>
     ${(st.mailLog || []).length ? `<div><h3 style="margin-bottom:6px">Recently sent</h3><ul class="list">${st.mailLog.slice().reverse().map(m => `<li><span>${esc(m.s)}</span><span class="mono">${m.n} people · ${md(m.t)} · ${esc(m.by || "")}</span></li>`).join("")}</ul></div>` : ""}</div>
   <div class="panel"><div class="row"><h2>Activity</h2><button class="btn small" id="adAudit">Show recent admin activity</button></div></div>`;
-  // Preserve the previous backend and original administrator code, but do not
-  // expose maintenance setup, worker QR check-in or data troubleshooting.
-  $("maintenanceTestPanel")?.remove();
-  $("adTest")?.closest(".panel")?.remove();
   fillTpl(); mlCount();
+  if (!DEMO) loadMaintenanceTest();
 }
 let maintenanceTestLoad = 0;
 // loadMaintenanceTest: checks the live connection and, if the QR check-in
@@ -1487,7 +1476,7 @@ function startWatchAlerts() {
   pollWatchAlerts();
 }
 // When the app comes back to the screen, check right away.
-// No maintenance alert checks in the scheduling application.
+document.addEventListener("visibilitychange", () => { if (!document.hidden) pollWatchAlerts(); });
 
 // ---------------------------------------------------------------------
 // START: in demo mode go straight in; otherwise begin sign-in.

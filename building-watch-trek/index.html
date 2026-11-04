@@ -12,7 +12,7 @@
 <!-- and the install file (manifest) that lets phones install it as an app. -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Starfleet Scheduling — Building Watch</title>
+<title>Building Watch — Star Trek Test</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#122538">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -194,7 +194,7 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
 <!-- SIGN-IN GATE -->
 <main class="gate" id="gate">
   <div class="panel" id="gateBody">
-    <div><div class="eyebrow">Starfleet Operations · Scheduling</div><h1>Starfleet Scheduling</h1></div>
+    <div><div class="eyebrow">USS Enterprise</div><h1>Building Watch — Star Trek Test</h1></div>
     <p class="sub">Loading…</p>
   </div>
 </main>
@@ -207,12 +207,13 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
   </div>
   <header>
     <div>
-      <div class="eyebrow">Starfleet Operations · Scheduling</div>
-      <h1>Starfleet Scheduling</h1>
+      <div class="eyebrow">USS Enterprise</div>
+      <h1>Building Watch — Star Trek Test</h1>
       <p class="sub" id="incharge"></p>
     </div>
     <div class="hright">
-      <button class="btn primary" id="quickReq" hidden>+ Service request</button>
+      <button class="btn primary" id="quickReq">+ Service request</button>
+      <a class="btn small" id="switchApp" href="../building-watch-scheduling/">Scheduling console</a>
       <span class="why" id="whoChip"></span>
       <button class="btn small" id="signOut">Sign out</button>
     </div>
@@ -223,18 +224,12 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
   </div>
   <!-- The tab bar (filled in by app.js, since the tabs depend on the person). -->
   <nav class="tabs" id="tabs" role="tablist"></nav>
-  <section id="scheduleConnectionProblem" class="panel" hidden role="alert">
-    <h2>Unable to load the schedule</h2>
-    <p class="sub">The existing Google backend did not respond successfully. Your entries have not been changed. Check the internet connection and your authorized Google sign-in, then retry.</p>
-    <button class="btn primary" id="retryConnection" type="button">Retry connection</button>
-    <p class="why">You can also open the fictional-data demo using <code>?demo</code> at the end of this address.</p>
-  </section>
 
   <!-- TAB: My week (paint the times you will be in the building). -->
   <section id="s-week" class="cols">
     <div class="panel">
       <div class="row">
-        <div><h2>Set my building availability</h2>
+        <div><h2>When will you be in the building?</h2>
         <div class="sub">Drag down a day to paint your time. Drag over painted time to erase. Then save.</div></div>
         <div class="row" style="gap:8px">
           <button class="btn small" data-hrs aria-pressed="false" hidden>Extended hours</button>
@@ -253,7 +248,7 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
       </div>
       <div class="why" id="calNote"></div>
     </div>
-    <div class="panel"><h2>My assigned shifts</h2><div class="sub" style="margin-top:-8px">Your scheduled watches for this week.</div><div class="stack" id="myWatches"></div></div>
+    <div class="panel"><h2>My watches</h2><div class="sub" style="margin-top:-8px">Check off duties as you finish them.</div><div class="stack" id="myWatches"></div></div>
   </section>
 
   <!-- TAB: Watch bill (admins: who is in the building, and assign watches). -->
@@ -357,10 +352,11 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
 
 <!-- The app's code: settings, the shared rule book, then the screens. -->
 <script src="config.js"></script>
-<script src="core.js?v=20261104b"></script>
-<script src="app.js?v=20261104b"></script>
+<script src="core.js?v=20261104dual"></script>
+<script src="app.js?v=20261104dual"></script>
 <!-- Turns on offline support (sw.js) so the installed app opens quickly. -->
 <script>
+if (new URLSearchParams(location.search).has('demo')) document.getElementById('switchApp').href += '?demo';
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
 }

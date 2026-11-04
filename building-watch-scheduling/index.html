@@ -213,6 +213,7 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
     </div>
     <div class="hright">
       <button class="btn primary" id="quickReq" hidden>+ Service request</button>
+      <a class="btn small" id="switchApp" href="../building-watch-trek/">Full Building Watch</a>
       <span class="why" id="whoChip"></span>
       <button class="btn small" id="signOut">Sign out</button>
     </div>
@@ -357,10 +358,11 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
 
 <!-- The app's code: settings, the shared rule book, then the screens. -->
 <script src="config.js"></script>
-<script src="core.js"></script>
-<script src="app.js"></script>
+<script src="core.js?v=20261104dual"></script>
+<script src="app.js?v=20261104dual"></script>
 <!-- Turns on offline support (sw.js) so the installed app opens quickly. -->
 <script>
+if (new URLSearchParams(location.search).has('demo')) document.getElementById('switchApp').href += '?demo';
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
 }
