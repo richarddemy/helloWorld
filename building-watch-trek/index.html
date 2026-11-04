@@ -12,7 +12,7 @@
 <!-- and the install file (manifest) that lets phones install it as an app. -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Building Watch — Star Trek Test</title>
+<title>Starfleet Scheduling — Building Watch</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#122538">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -194,7 +194,7 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
 <!-- SIGN-IN GATE -->
 <main class="gate" id="gate">
   <div class="panel" id="gateBody">
-    <div><div class="eyebrow">USS Enterprise</div><h1>Building Watch — Star Trek Test</h1></div>
+    <div><div class="eyebrow">Starfleet Operations · Scheduling</div><h1>Starfleet Scheduling</h1></div>
     <p class="sub">Loading…</p>
   </div>
 </main>
@@ -207,12 +207,12 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
   </div>
   <header>
     <div>
-      <div class="eyebrow">USS Enterprise</div>
-      <h1>Building Watch — Star Trek Test</h1>
+      <div class="eyebrow">Starfleet Operations · Scheduling</div>
+      <h1>Starfleet Scheduling</h1>
       <p class="sub" id="incharge"></p>
     </div>
     <div class="hright">
-      <button class="btn primary" id="quickReq">+ Service request</button>
+      <button class="btn primary" id="quickReq" hidden>+ Service request</button>
       <span class="why" id="whoChip"></span>
       <button class="btn small" id="signOut">Sign out</button>
     </div>
@@ -228,7 +228,7 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
   <section id="s-week" class="cols">
     <div class="panel">
       <div class="row">
-        <div><h2>When will you be in the building?</h2>
+        <div><h2>Set my building availability</h2>
         <div class="sub">Drag down a day to paint your time. Drag over painted time to erase. Then save.</div></div>
         <div class="row" style="gap:8px">
           <button class="btn small" data-hrs aria-pressed="false" hidden>Extended hours</button>
@@ -247,7 +247,7 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
       </div>
       <div class="why" id="calNote"></div>
     </div>
-    <div class="panel"><h2>My watches</h2><div class="sub" style="margin-top:-8px">Check off duties as you finish them.</div><div class="stack" id="myWatches"></div></div>
+    <div class="panel"><h2>My assigned shifts</h2><div class="sub" style="margin-top:-8px">Check off duties as you finish them.</div><div class="stack" id="myWatches"></div></div>
   </section>
 
   <!-- TAB: Watch bill (admins: who is in the building, and assign watches). -->
