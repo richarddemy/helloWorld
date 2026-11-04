@@ -1,0 +1,19 @@
+{
+  "name": "Starfleet Scheduling — Building Watch",
+  "short_name": "Starfleet Schedule",
+  "description": "Building availability, watch assignments and personal calendar overlays.",
+  "id": "./",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101e2c",
+  "theme_color": "#122538",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
