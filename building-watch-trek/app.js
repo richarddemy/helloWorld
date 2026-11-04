@@ -204,7 +204,7 @@ const API = {
 const Demo = {
   // key: where the sample data is saved in this browser.
   // as: whether the demo is acting as the admin or as a member.
-  key: "bw-star-trek-demo-v1", as: "admin", st: null,
+  key: "bw-star-trek-scheduling-demo-v2", as: "admin", st: null,
   emails: { admin: "picard@demo.invalid", member: "data@demo.invalid" },
   // load: use saved sample data, or create fresh sample data.
   load() { try { const t = localStorage.getItem(this.key); if (t) { this.st = JSON.parse(t); return; } } catch (e) {} this.st = seed(); },
@@ -429,7 +429,7 @@ function followups() { return D.log.filter(l => isOut(l) && !l.fuClosed && (l.do
 // current tab.
 function render() {
   // Small number badges on tabs (follow-ups, open requests).
-  const b = { log: followups().length, reqs: D.admin ? D.requests.filter(r => r.status === "Open").length : 0 };
+  const b = {}; // Scheduling view has no maintenance or service-request badges.
   $("tabs").innerHTML = tabList().map(([k, l]) => `<button role="tab" aria-selected="${k === tab}" data-tab="${k}">${l}${b[k] ? `<span class="badge">${b[k]}</span>` : ""}</button>`).join("");
   const wk = week();
   $("wkLabel").textContent = `Week of ${parse(wk[0]).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}`;
@@ -1479,7 +1479,7 @@ function startWatchAlerts() {
   pollWatchAlerts();
 }
 // When the app comes back to the screen, check right away.
-document.addEventListener("visibilitychange", () => { if (!document.hidden) pollWatchAlerts(); });
+// Scheduling-only edition does not poll maintenance alerts on visibility changes.
 
 // ---------------------------------------------------------------------
 // START: in demo mode go straight in; otherwise begin sign-in.
