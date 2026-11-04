@@ -304,7 +304,7 @@ function seed() {
 // ---------------------------------------------------------------------
 // gate: show the sign-in screen (instead of the app) with a message.
 /* ---------- sign-in gate ---------- */
-function gate(html) { $("app").hidden = true; $("gate").hidden = false; $("gateBody").innerHTML = `<div><div class="eyebrow">Facilities</div><h1>Building Watch</h1></div>` + html; }
+function gate(html) { $("app").hidden = true; $("gate").hidden = false; $("gateBody").innerHTML = `<div><div class="eyebrow">Starfleet Operations · Scheduling</div><h1>Starfleet Scheduling</h1></div>` + html; }
 // jwt: read the readable middle part of a Google sign-in pass (expiry time).
 function jwt(t) { try { return JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))); } catch (e) { return {}; } }
 // loadGIS: load Google's sign-in button from Google.
