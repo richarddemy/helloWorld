@@ -204,7 +204,7 @@ const API = {
 const Demo = {
   // key: where the sample data is saved in this browser.
   // as: whether the demo is acting as the admin or as a member.
-  key: "bw-star-trek-shared-demo-v1", as: "admin", st: null,
+  key: "bw-star-trek-shared-demo-v2", as: "admin", st: null,
   emails: { admin: "picard@demo.invalid", member: "data@demo.invalid" },
   // load: use saved sample data, or create fresh sample data.
   load() { try { const t = localStorage.getItem(this.key); if (t) { this.st = JSON.parse(t); return; } } catch (e) {} this.st = seed(); },
@@ -276,6 +276,32 @@ function seed() {
   [[2, 8, 12], [3, 12, 16]].forEach(r => block("Kathryn Janeway", ...r));
   [[0, 7.5, 10], [3, 8, 16], [4, 12, 16]].forEach(r => block("Kira Nerys", ...r));
   [[1, 9, 13], [2, 7.5, 9.5]].forEach(r => block("Deanna Troi", ...r));
+
+  // Fictional scheduling data to the end of 2026. Existing first-week examples win;
+  // no real user records or backend data are touched in browser demo mode.
+  const samplePatterns=[[2,15],[1,17],[1,17],[2,15],[0,17],[0,17],[1,11],[5,17],[3,13]];
+  const until=new Date("2026-12-31T12:00:00Z");
+  const from=new Date(wk[0]+"T12:00:00Z");
+  let workIndex=0;
+  for(let d=new Date(from);d<=until;d.setUTCDate(d.getUTCDate()+1)){
+    const dow=d.getUTCDay();if(dow===0||dow===6)continue;
+    const date=d.toISOString().slice(0,10),weekNo=Math.floor(workIndex/5);
+    people.forEach((p,i)=>{
+      if(avail.some(a=>a.pid===p.id&&a.date===date))return;
+      // Deliberate missing submissions are distinct from explicitly unavailable days.
+      if((i===5&&weekNo%3===1)||(i===8&&dow===1)||(i===7&&weekNo%4===2&&dow===5))return;
+      const slots=ZERO.split(""),base=samplePatterns[i];
+      const noTime=date==="2026-11-26"||date==="2026-12-25"||(workIndex+i*2)%19===0;
+      if(!noTime){
+        let start=base[0]+(dow===3&&i%3===0?1:0),end=base[1]-(dow===5&&i%2===0?1:0);
+        if(i===6&&dow===2)end=17;
+        if(i===7&&dow===2)start=1;
+        for(let j=start;j<end;j++)slots[j]="1";
+      }
+      avail.push({pid:p.id,date,slots:slots.join(""),ev:[]});
+    });
+    workIndex++;
+  }
   const W = (n, d, s, e, checks) => ({ id: Core.uid(), pid: id(n), date: wk[d], s, e, checks: checks || {}, ev: "" });
   const T = Core.DEF_TMPL, all = {}; T.forEach(x => all[x] = 1);
   const watches = [W("Worf", 0, 0, 8, all), W("Data", 0, 8, 12, { [T[0]]: 1, [T[1]]: 1 }), W("Kira Nerys", 0, 0, 5, all), W("Nyota Uhura", 1, 0, 7, { [T[0]]: 1 }), W("Jean-Luc Picard", 1, 8, 14), W("Worf", 2, 0, 8), W("Data", 2, 4, 12)];
@@ -481,7 +507,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("modal"
 // The pop-up's buttons call the matching save function by name.
 $("dlgAct").addEventListener("click", e => {
   const a = e.target.dataset.act; if (!a) return;
-  ({ saveReq, saveWatch, saveCI, saveCO,
+  ({ saveReq, saveWatch, saveCI, saveCO, commitPlan,
     discard: () => { closeModal(); dirty = false; const f = pendingNav; pendingNav = null; f && f(); },
     saveThen: async () => { closeModal(); await saveMyWeek(); const f = pendingNav; pendingNav = null; f && f(); } })[a]?.();
 });
@@ -675,11 +701,80 @@ function drawHeat() {
 }
 // drawBill: the chart plus the list of this week's watches.
 function drawBill() {
-  drawPick(); drawHeat();
+  drawPick(); drawHeat(); renderRoster();
   $("inviteNote").textContent = D.settings.invites ? "Each person on watch gets a private calendar invitation." : "Calendar invitations are turned off in Admin.";
   const T = D.settings.tmpl.length;
   $("allAsg").innerHTML = D.watches.length ? D.watches.map(x => `<li><span><b>${esc(pname(x.pid))}</b></span><span class="mono">${dayLbl(x.date)} ${span(x)} · ${D.settings.tmpl.filter(t => x.checks[t]).length}/${T}</span></li>`).join("") : "<li class='empty'>No watches this week.</li>";
 }
+// Shared recommendation panel; decisions remain admin-reviewed draft writes.
+function scheduler() {
+  return BWWatchPlanner.create({people:D.people,avail:D.avail,watches:D.watches,
+    week:week(),grid:GRID,monthCounts:D.monthCounts||{}});
+}
+function renderRoster() {
+  const p=scheduler(),r=p.summary(),plan=p.plan(false);
+  $("watchRoster").innerHTML='<table class="tbl"><tr><th>Person</th><th>Submitted</th><th>Available</th><th>Assigned</th><th>Status</th></tr>'+
+    r.map(x=>'<tr><td><b>'+esc(x.p.name)+'</b></td><td>'+x.submitted+'/5 days</td><td>'+x.availableHours+
+    ' h</td><td>'+x.assignedHours+' h</td><td>'+(x.submitted===0?'<span class="chip warn">No schedule</span>':
+    x.zeroDays?'<span class="chip warn">'+x.zeroDays+' unavailable day(s)</span>':
+    x.submitted<5?'<span class="chip">Incomplete submission</span>':
+    '<span class="chip ok">Submitted</span>')+'</td></tr>').join('')+'</table>';
+  $("watchProposals").innerHTML='<p class="sub">'+plan.proposals.length+' open standard watches with a recommended person · '+
+    plan.skipped.length+' protected existing watches · '+plan.unfilled.length+' unfilled</p>'+
+    plan.proposals.slice(0,5).map(x=>'<div class="watchcard"><div class="row"><b>'+esc(dayLbl(x.date))+
+    ' '+fmt(SLOTS[x.s])+'–'+fmt(SLOTS[x.e-1]+30)+'</b><span class="chip ok">'+esc(x.name)+'</span></div>'+
+    '<span class="why">'+x.beforeHours+' assigned hours so far · '+esc(x.state)+'</span></div>').join('');
+}
+function proposalList(plan) {
+  return plan.proposals.map(x=>'<li class="watchcard"><div class="row"><b>'+
+    esc(dayLbl(x.date))+' '+fmt(SLOTS[x.s])+'–'+fmt(SLOTS[x.e-1]+30)+
+    '</b><b>'+esc(x.name)+'</b></div><span class="why">'+
+    (x.exception?'EXCEPTION: '+esc(x.state)+'; not proof of attendance':'Available for entire watch')+
+    ' · '+x.beforeHours+' assigned hours this week</span></li>').join('')||
+    '<li class="empty">No additional watch drafts proposed.</li>';
+}
+function refreshAutoPlan() {
+  const exceptions=!!$("forceCoverage")?.checked,plan=scheduler().plan(exceptions);
+  $("planRows").innerHTML='<p class="why">'+plan.proposals.length+' proposed · '+plan.skipped.length+
+    ' existing watches preserved · '+plan.unfilled.length+' unfilled</p><ul class="list">'+proposalList(plan)+'</ul>';
+  $("planWarning").hidden=!plan.proposals.some(x=>x.exception);
+}
+function previewAutoPlan() {
+  openModal('Auto-assign the week','Review proposals for the usual 0800–1000 and 1400–1600 watches. Nothing will change until you confirm.',
+    '<label class="inline"><input type="checkbox" id="forceCoverage">Allow people without reported availability as a last resort (exception)</label>'+
+    '<div id="planRows"></div><p id="planWarning" class="chip warn" hidden>One or more people are not marked available. Assignment does not confirm attendance.</p>'+
+    '<label class="inline"><input type="checkbox" id="confirmPlan">I authorize saving these proposed draft watches.</label>',
+    '<button class="btn" data-act="cancel">Cancel</button><button class="btn primary" data-act="commitPlan">Save watch drafts</button>');
+  refreshAutoPlan();
+}
+$("autoPlan").onclick=previewAutoPlan;
+$("dlgBody").addEventListener("change",e=>{if(e.target.id==="forceCoverage")refreshAutoPlan();});
+async function commitPlan() {
+  if(!$("confirmPlan")?.checked){toast("Check the authorization box before saving.","err");return;}
+  const exceptions=!!$("forceCoverage")?.checked,expectedWeek=week().join(",");
+  $("dlgAct").querySelectorAll("button").forEach(b=>b.disabled=true);
+  let saved=0;
+  try {
+    // Obtain the latest watch bill before assigning, so a stale preview
+    // does not intentionally overwrite any existing standard watch.
+    const fresh=await API.call("load",{week:week()});
+    if(!fresh?.admin)throw new Error("Administrator permission required.");
+    if(week().join(",")!==expectedWeek)throw new Error("Week changed. Preview again.");
+    D=fresh;setGrid(D.grid);
+    const plan=scheduler().plan(exceptions);
+    for(const w of plan.proposals){
+      await API.call("watch.save",{date:w.date,s:w.s,e:w.e,pids:[w.pid]});
+      saved++;
+    }
+    closeModal();
+    toast(saved?saved+" watch drafts saved; calendar publication is separate.":"No new drafts required.");
+  }catch(e){
+    closeModal();
+    toast("Saved "+saved+" drafts before stopping: "+(e.message||"Unexpected error"),"err");
+  }
+  await loadWeek();
+}
+
 // Dragging on the chart selects a block of time on one day.
 let drag = null; const hg = $("heatGrid");
 const hcell = e => { const el = document.elementFromPoint(e.clientX, e.clientY); return el && el.closest ? el.closest("#heatGrid td") : null; };
@@ -726,16 +821,17 @@ function openAssign() {
   const w = whoIn(date, s).map(p => p.name), st = standers(date, s).map(pname);
   $("slotInfo").innerHTML = `<b>${dayLbl(date)} ${fmt(SLOTS[s])}</b>: ${w.length ? esc(w.join(", ")) : "<span style='color:var(--warn)'>nobody in the building</span>"}<br>Watch: ${st.length ? "<b>" + esc(st.join(", ")) + "</b>" : "<span style='color:var(--warn)'>not assigned</span>"}`;
   const onNow = new Set(D.watches.filter(x => x.date === date && x.s < e && x.e > s).map(x => x.pid));
-  // Rank each person: in the whole time scores highest; many watches this
-  // month lowers the score; names picked above the chart rise to the top.
-  const rows = watchers().map(p => { let c = 0; for (let i = s; i < e; i++) if (slotsOf(p.id, date)[i] === "1") c++;
-    return { p, c, score: (c === n ? 100 : c / n * 40) - (D.monthCounts[p.id] || 0) * 6 + (onNow.has(p.id) ? 200 : 0) + (chosen.has(p.id) ? 300 : 0) }; })
-    .filter(r => r.c > 0 || onNow.has(r.p.id) || chosen.has(r.p.id)).sort((a, b) => b.score - a.score);
-  const pre = new Set([...onNow, ...chosen]); if (!pre.size && rows.length && rows[0].c === n) pre.add(rows[0].p.id);
-  const body = rows.length ? rows.map(r => {
-    const status = r.c === n ? '<span class="chip ok">In the whole time</span>' : r.c ? `<span class="chip warn">In ${r.c} of ${n} half hours</span>` : '<span class="chip warn">Not in the building</span>';
-    return `<label class="cand"><input type="checkbox" value="${r.p.id}" ${pre.has(r.p.id) ? "checked" : ""}><div class="item"><b>${esc(r.p.name)}</b><div class="row start" style="gap:6px">${status}${onNow.has(r.p.id) ? '<span class="chip gold">On watch now</span>' : ""}<span class="why">${D.monthCounts[r.p.id] || 0} watches this month</span></div></div></label>`;
-  }).join("") : "<div class='empty'>Nobody is in the building then. Tap names above the chart to assign someone anyway.</div>";
+  const ranked=scheduler().candidates(date,s,e);
+  const pre=new Set([...onNow,...chosen]);
+  if(!pre.size){const first=ranked.find(r=>r.category===0&&!r.overlap);if(first)pre.add(first.p.id);}
+  const body=ranked.map(r=>`<label class="cand"><input type="checkbox" value="${esc(r.p.id)}" ${pre.has(r.p.id)?"checked":""}>
+    <div class="item"><div class="row start" style="gap:6px"><b>${esc(r.p.name)}</b>
+    ${r.category===0?'<span class="chip ok">Available</span>':'<span class="chip warn">'+esc(r.state)+'</span>'}
+    ${onNow.has(r.p.id)?'<span class="chip gold">Already assigned</span>':""}</div>
+    <span class="why">${r.assignedHours} h assigned / ${r.availableHours} h available this week ·
+      ${r.monthCount} watch assignments this month</span></div></label>`).join("")||
+    "<div class='empty'>No available watch standers configured.</div>";
+
   openModal(`Watch: ${dayLbl(date)}, ${fmt(SLOTS[s])}-${fmt(SLOTS[e - 1] + 30)}`, "Check everyone who should stand this watch.", body,
     `<span class="why" id="wCount"></span><div class="row" style="gap:8px"><button class="btn" data-act="cancel">Cancel</button><button class="btn primary" data-act="saveWatch">Save watch</button></div>`);
   updCount();
@@ -749,6 +845,8 @@ $("dlgBody").addEventListener("input", e => { if (e.target.id === "coProb") $("c
 // saveWatch: send the chosen people for this watch to the backend.
 async function saveWatch() {
   const { d, s, e } = sel, pids = [...$("dlgBody").querySelectorAll(".cand input:checked")].map(i => i.value);
+  const unavailable=scheduler().candidates(week()[d],s,e).filter(r=>pids.includes(r.p.id)&&r.category!==0);
+  if(unavailable.length&&!confirm("Override their reported availability? "+unavailable.map(r=>r.p.name+" ("+r.state+")").join(", ")+" — this does not confirm they can attend."))return;
   closeModal();
   await act(() => API.call("watch.save", { date: week()[d], s, e, pids }), () => pids.length ? `Watch draft saved: ${pids.map(pname).join(', ')} (not published)` : 'Watch cleared');
   await loadWeek();

@@ -14,6 +14,10 @@ The live application requires the configured Google account and an accessible wo
 
 **Security:** This is still a public GitHub Pages frontend. Do not use real operational Navy personnel or watch information until command cybersecurity authorization and the Google service authorization boundary have been established.
 
+## Watch coverage planner (4 November 2026)
+The admin Watch Bill / Duty Schedule now ranks watch standers by submitted availability and relative weekly assigned hours, shows incomplete or missing submissions, and offers a reviewed auto-assign action for two standard watch windows per weekday. It does not replace existing watches, automatically publish calendars, or require new backend endpoints. A manually approved exception can select someone who has not indicated availability. Neither a missing submission nor a marked-unavailable entry proves whether that person can attend.
+The two test apps share the same data source. The Google Sheets availability has fictional examples through December 2026. The separate browser demo has its own fictional version and sends no data to Google.
+ 
 ## Two-front-end testbed (4 November 2026)
 
 These are separate GitHub Pages interfaces to the **same configured Google Apps Script endpoint and Google Sheets**. No backend change is required for existing scheduling operations.

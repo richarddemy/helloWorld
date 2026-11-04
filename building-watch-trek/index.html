@@ -133,7 +133,10 @@ textarea{min-height:58px;resize:vertical}
 .pick{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .pk{border:1px solid var(--line);background:var(--bg);color:var(--ink);font:500 .8rem var(--f-body);padding:5px 10px;border-radius:99px;cursor:pointer}
 .pk[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-/* Lists, chips (small tags like "in now"), tables. */
+#watchPlannerPanel .tbl{min-width:520px}#watchPlannerPanel .watchcard{font-size:.85rem}
+ #planRows{max-height:39vh;overflow-y:auto}#watchPlannerPanel .row{align-items:center}
+ @media(max-width:600px){#autoPlan{width:100%}}
+ /* Lists, chips (small tags like "in now"), tables. */
 ul.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:.88rem}
 ul.list>li{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--line);padding-bottom:7px}
 .item{display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -272,9 +275,14 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
       <div class="why" data-hrs-note hidden></div>
       <div id="slotInfo" class="empty">Drag down a day to set the watch for that block of time.</div>
     </div>
+    <div class="panel" id="watchPlannerPanel"><div class="row">
+      <div><h2>Watch coverage planner</h2><p class="sub">Weekly availability, watch hours and recommendations</p></div>
+      <button class="btn primary" type="button" id="autoPlan">Auto-assign preview</button></div>
+      <div class="why">Based on submitted time and fair distribution of watch hours. Existing watches are never overwritten by auto-assignment.</div>
+      <div class="scroll" id="watchRoster"></div><div class="stack" id="watchProposals"></div></div>
     <div class="panel">
       <h2>Assign the watch</h2>
-      <p class="sub" style="margin:0">Tap one or more names, then drag down a day. Confirm in the box that opens. With "Suggest for me," drag first and check off people from who is in the building.</p>
+      <p class="sub" style="margin:0">Pick a time range on the grid to see ranked candidates. Administrators can explicitly override missing or unavailable schedules when necessary.</p>
       <p class="sub" style="margin:0" id="inviteNote"></p>
       <div><h3 style="margin-bottom:6px">Watch bill this week</h3><ul class="list" id="allAsg"></ul></div>
     </div>
@@ -353,7 +361,8 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
 <!-- The app's code: settings, the shared rule book, then the screens. -->
 <script src="config.js"></script>
 <script src="core.js?v=20261104dual"></script>
-<script src="app.js?v=20261104dual"></script>
+<script src="watch-planner.js?v=20261104smart"></script>
+<script src="app.js?v=20261104smart"></script>
 <!-- Turns on offline support (sw.js) so the installed app opens quickly. -->
 <script>
 if (new URLSearchParams(location.search).has('demo')) document.getElementById('switchApp').href += '?demo';
