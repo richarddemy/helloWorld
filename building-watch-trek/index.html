@@ -223,6 +223,12 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
   </div>
   <!-- The tab bar (filled in by app.js, since the tabs depend on the person). -->
   <nav class="tabs" id="tabs" role="tablist"></nav>
+  <section id="scheduleConnectionProblem" class="panel" hidden role="alert">
+    <h2>Unable to load the schedule</h2>
+    <p class="sub">The existing Google backend did not respond successfully. Your entries have not been changed. Check the internet connection and your authorized Google sign-in, then retry.</p>
+    <button class="btn primary" id="retryConnection" type="button">Retry connection</button>
+    <p class="why">You can also open the fictional-data demo using <code>?demo</code> at the end of this address.</p>
+  </section>
 
   <!-- TAB: My week (paint the times you will be in the building). -->
   <section id="s-week" class="cols">
@@ -247,7 +253,7 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
       </div>
       <div class="why" id="calNote"></div>
     </div>
-    <div class="panel"><h2>My assigned shifts</h2><div class="sub" style="margin-top:-8px">Your assigned duty periods for this week.</div><div class="stack" id="myWatches"></div></div>
+    <div class="panel"><h2>My assigned shifts</h2><div class="sub" style="margin-top:-8px">Your scheduled watches for this week.</div><div class="stack" id="myWatches"></div></div>
   </section>
 
   <!-- TAB: Watch bill (admins: who is in the building, and assign watches). -->
@@ -351,8 +357,8 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-nume
 
 <!-- The app's code: settings, the shared rule book, then the screens. -->
 <script src="config.js"></script>
-<script src="core.js?v=scheduling-2"></script>
-<script src="app.js?v=scheduling-2"></script>
+<script src="core.js?v=20261104b"></script>
+<script src="app.js?v=20261104b"></script>
 <!-- Turns on offline support (sw.js) so the installed app opens quickly. -->
 <script>
 if ('serviceWorker' in navigator && location.protocol === 'https:') {

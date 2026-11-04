@@ -1,7 +1,7 @@
 {
   "name": "Starfleet Scheduling — Building Watch",
   "short_name": "Starfleet Schedule",
-  "description": "Building availability, duty watch scheduling, and calendar overlays in the Star Trek interface.",
+  "description": "Building availability, watch assignments and personal calendar overlays.",
   "id": "./",
   "start_url": "./index.html",
   "scope": "./",

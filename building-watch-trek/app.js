@@ -129,7 +129,7 @@ const loadLines = [
   "Contacting Starfleet Command…",
   "Authenticating command credentials…",
   "Requesting duty rosters from the main computer…",
-  "Synchronizing crew availability and watch assignments…",
+  "Synchronizing crew availability and assigned shifts…",
   "Calibrating long-range calendar sensors…",
   "Awaiting subspace transmission…",
   "Routing data through the Enterprise computer core…",
@@ -380,7 +380,7 @@ async function boot() {
     $("gate").hidden = true; $("app").hidden = false;
     $("demoBar").hidden = !DEMO; $("signOut").hidden = DEMO;
     await loadWeek();
-    // Scheduling-only app: no maintenance check-in or worker alerts.
+    // Scheduling mode has no maintenance arrival/assistance alerts.
   } finally { endLoading(); }
 }
 // loadWeek: fetch everything for the week on screen and redraw.
@@ -388,7 +388,15 @@ async function loadWeek(keepTab) {
   beginLoading("Requesting duty rosters from the main computer…");
   try {
   const d = await act(() => API.call("load", { week: week() }));
-  if (!d) return;
+  if (!d) {
+    // Previously the app became a blank screen after a backend error.
+    // Keep a visible retry action instead of trapping the user.
+    const problem = $("scheduleConnectionProblem");
+    if (problem) problem.hidden = false;
+    return;
+  }
+  const problem = $("scheduleConnectionProblem");
+  if (problem) problem.hidden = true;
   D = d;
   // Use whatever time grid the backend reports.
   setGrid(D.grid);
@@ -409,8 +417,8 @@ async function loadWeek(keepTab) {
 }
 // tabList: the tabs this person sees. Admins see more.
 function tabList() {
-  // Scheduling-only navigation. Maintenance and service functions remain
-  // untouched in the backend but are not presented to users here.
+  // Reuse all original scheduling logic and the same backend;
+  // hide unrelated operations without deleting or rewriting them.
   const t = [["week", "My availability"]];
   if (D.admin) t.push(["bill", "Duty schedule"]);
   t.push(["mine", "My calendars"]);
@@ -429,7 +437,7 @@ function followups() { return D.log.filter(l => isOut(l) && !l.fuClosed && (l.do
 // current tab.
 function render() {
   // Small number badges on tabs (follow-ups, open requests).
-  const b = {}; // Scheduling view has no maintenance or service-request badges.
+  const b = {}; // No maintenance badges in scheduling mode.
   $("tabs").innerHTML = tabList().map(([k, l]) => `<button role="tab" aria-selected="${k === tab}" data-tab="${k}">${l}${b[k] ? `<span class="badge">${b[k]}</span>` : ""}</button>`).join("");
   const wk = week();
   $("wkLabel").textContent = `Week of ${parse(wk[0]).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}`;
@@ -450,6 +458,7 @@ $("wkPrev").onclick = leaveWeek(() => { weekStart = addDays(weekStart, -7); load
 $("wkNext").onclick = leaveWeek(() => { weekStart = addDays(weekStart, 7); loadWeek(); });
 $("wkNow").onclick = leaveWeek(() => { weekStart = monday(new Date()); loadWeek(); });
 $("signOut").onclick = () => signOut();
+$("retryConnection").onclick = () => loadWeek();
 // Warn before closing the page if there is unsaved time.
 window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
 
@@ -1157,9 +1166,8 @@ function drawAdmin() {
     <div class="row"><span class="why" id="mlCount"></span><button class="btn primary" id="mlSend">Send</button></div>
     ${(st.mailLog || []).length ? `<div><h3 style="margin-bottom:6px">Recently sent</h3><ul class="list">${st.mailLog.slice().reverse().map(m => `<li><span>${esc(m.s)}</span><span class="mono">${m.n} people · ${md(m.t)} · ${esc(m.by || "")}</span></li>`).join("")}</ul></div>` : ""}</div>
   <div class="panel"><div class="row"><h2>Activity</h2><button class="btn small" id="adAudit">Show recent admin activity</button></div></div>`;
-  // Scheduling-only interface: remove maintenance check-in setup and
-  // backend troubleshooting from the visible admin screens. Calendar
-  // publishing, personnel and schedule reminder email remain available.
+  // Preserve the previous backend and original administrator code, but do not
+  // expose maintenance setup, worker QR check-in or data troubleshooting.
   $("maintenanceTestPanel")?.remove();
   $("adTest")?.closest(".panel")?.remove();
   fillTpl(); mlCount();
@@ -1479,7 +1487,7 @@ function startWatchAlerts() {
   pollWatchAlerts();
 }
 // When the app comes back to the screen, check right away.
-// Scheduling-only edition does not poll maintenance alerts on visibility changes.
+// No maintenance alert checks in the scheduling application.
 
 // ---------------------------------------------------------------------
 // START: in demo mode go straight in; otherwise begin sign-in.
