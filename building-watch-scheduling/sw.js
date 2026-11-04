@@ -6,7 +6,7 @@
 // people get the newest version whenever they are online.
 // The name of the saved copy. Changing the number (v7 to v8) makes every
 // installed copy throw away its old saved files.
-const CACHE_NAME = 'building-watch-scheduling-planner-v3';
+const CACHE_NAME = 'building-watch-scheduling-install-v4';
 // The files to keep a copy of.
 const FILES = ['./', './index.html', './config.js', './core.js', './app.js', './watch-planner.js', './icon.svg', './manifest.webmanifest'];
 // When installed: save copies of the files, then take over straight away.

@@ -13,7 +13,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Building Watch — Star Trek Test</title>
-<link rel="manifest" href="manifest.webmanifest">
+<link rel="manifest" href="manifest.webmanifest" id="appManifest">
+<script>
+// A demo installed from ?demo must reopen with its fictional data,
+// instead of unexpectedly showing the live Google account sign-in.
+if (new URLSearchParams(location.search).has("demo")) {
+  document.getElementById("appManifest").href = "manifest-demo.webmanifest";
+}
+</script>
 <meta name="theme-color" content="#122538">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
