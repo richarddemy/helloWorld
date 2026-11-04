@@ -129,7 +129,7 @@ const loadLines = [
   "Contacting Starfleet Command…",
   "Authenticating command credentials…",
   "Requesting duty rosters from the main computer…",
-  "Synchronizing personnel and maintenance records…",
+  "Synchronizing crew availability and watch assignments…",
   "Calibrating long-range calendar sensors…",
   "Awaiting subspace transmission…",
   "Routing data through the Enterprise computer core…",
@@ -380,7 +380,7 @@ async function boot() {
     $("gate").hidden = true; $("app").hidden = false;
     $("demoBar").hidden = !DEMO; $("signOut").hidden = DEMO;
     await loadWeek();
-    startWatchAlerts();
+    // Scheduling-only app: no maintenance check-in or worker alerts.
   } finally { endLoading(); }
 }
 // loadWeek: fetch everything for the week on screen and redraw.
@@ -409,13 +409,12 @@ async function loadWeek(keepTab) {
 }
 // tabList: the tabs this person sees. Admins see more.
 function tabList() {
-  const t = [["week", "My week"]];
-  if (D.admin) t.push(["bill", "Watch bill"]);
-  t.push(["log", "Maintenance staff"]);
-  t.push(["crew", D.admin ? "Facilities team assignments" : "My facilities assignments"]);
-  t.push(["reqs", "Maintenance requests"]);
-  if (D.admin) t.push(["reports", "Reports"], ["admin", "Admin"]);
-  t.push(["mine", "My settings"]);
+  // Scheduling-only navigation. Maintenance and service functions remain
+  // untouched in the backend but are not presented to users here.
+  const t = [["week", "My availability"]];
+  if (D.admin) t.push(["bill", "Duty schedule"]);
+  t.push(["mine", "My calendars"]);
+  if (D.admin) t.push(["admin", "Schedule admin"]);
   return t;
 }
 // Quick lookups: a person by code, a name by code, and everyone who stands watch.
@@ -1158,8 +1157,12 @@ function drawAdmin() {
     <div class="row"><span class="why" id="mlCount"></span><button class="btn primary" id="mlSend">Send</button></div>
     ${(st.mailLog || []).length ? `<div><h3 style="margin-bottom:6px">Recently sent</h3><ul class="list">${st.mailLog.slice().reverse().map(m => `<li><span>${esc(m.s)}</span><span class="mono">${m.n} people · ${md(m.t)} · ${esc(m.by || "")}</span></li>`).join("")}</ul></div>` : ""}</div>
   <div class="panel"><div class="row"><h2>Activity</h2><button class="btn small" id="adAudit">Show recent admin activity</button></div></div>`;
+  // Scheduling-only interface: remove maintenance check-in setup and
+  // backend troubleshooting from the visible admin screens. Calendar
+  // publishing, personnel and schedule reminder email remain available.
+  $("maintenanceTestPanel")?.remove();
+  $("adTest")?.closest(".panel")?.remove();
   fillTpl(); mlCount();
-  if (!DEMO) loadMaintenanceTest();
 }
 let maintenanceTestLoad = 0;
 // loadMaintenanceTest: checks the live connection and, if the QR check-in
